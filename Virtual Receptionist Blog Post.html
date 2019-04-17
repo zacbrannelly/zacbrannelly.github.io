@@ -282,7 +282,7 @@ Since the DrQA system requires a lot of RAM and storage space and it must be on 
 <span class="token punctuation">}</span>
 </code></pre>
 <p>Use <a href="https://api.duckduckgo.com/?q=What%20is%20Apple&amp;format=json&amp;pretty=1">https://api.duckduckgo.com/?q=What%20is%20Apple&amp;format=json&amp;pretty=1</a> to see the full response.</p>
-<p>So I decided to implement this as a backup to when we don’t have a server running  for DrQA. As a bonus I used the image link  that is sometimes provided to be shown in a dialog on the screen like so:<br>
+<p>So I decided to implement this as a backup to when we don’t have a server running  for DrQA. Where the <code>AbstractText</code> field is considered the answer. As a bonus I used the image link  that is sometimes provided to be shown in a dialog on the screen like so:<br>
 <img src="https://lh3.googleusercontent.com/QhYZSKoqpoedH-zyiP3rgCPA91WkCGd28STOM4INki1QrJwtaw_W2ttKff6LxNkAJVbc3T9gsI-2=s500" alt="enter image description here"><br>
 <em>Figure 9: Dialog box showing image of an apple after asking “What is apple?”</em></p>
 <h3 id="chatscript">ChatScript</h3>
@@ -311,8 +311,55 @@ u: ( !~negativeWords I * ~like * ~meat ) You like meat.
 ?: ( do you eat _ [ ham eggs bacon] ) I eat '_0
 </code></pre>
 <p>Where the words/symbols in the brackets are patterns (think of them like regular expressions) which are used to match user input with responses that are positioned outside the brackets. The prefix before the pattern tells ChatScript what type of input should be checked against the pattern, where <code>s:</code> means statements, <code>?:</code> means questions and <code>u:</code> means both (union). So off the bat there is much more of a learning curve using ChatScript over Dialogflow. You have to first learn the syntax of the scripting language and then the syntax of the pattern expressions. It is a lot more challenging to match input with an intent since in Dialogflow you can just come up with  a few variations of input during the training phase.</p>
-<p>But it does come with some advantages…</p>
+<p>But it does come with some advantages over Dialogflow. The first being the scripting language supports variables and if-statements! Which for a programmer makes them feel right at home and it makes controlling the flow of the conversation a lot more intuitive than how it is accomplished in Dialogflow (which is by using things called contexts). For example:</p>
+<pre><code>s: ( my name is _* )
+	$userName = _0
+	[So nice to meet you $userName]
+	[Nice to meet you $userName] 
+	
+?: ( what is my name )
+	if ($userName)
+	{
+		[You're name is $userName]
+		[I know you, your name is $userName]
+	}
+	else
+	{
+		[I don't know you.]
+		[Sorry, don't know your name.]
+	}
+</code></pre>
+<p>Then next advantage is the concept of out-of-band (OOB) data which is the ability to send &amp; receive data that isn’t human input. For example if we wanted ChatScript to know what state the system is currently in we could send the state name in OOB data format (<code>[state WaitingForUsers]</code>) where ChatScript could use the pattern <code>( &lt; \[ state _* \] )</code> (where the <code>_*</code> symbols means save the next word(s) into the <code>_0</code> variable) to match with that input and save the data inside. We can then save the new state to a variable (<code>$currentState = _0</code>) and then alter responses according to that variable. OOB data can also be put into responses from ChatScript which is useful when you want to activate a function or state in the front-end application. For example when the bot asks a question to the user we might want the receptionist to start recording automatically so we could add <code>[{ "command": "StartRecording" }]</code> to the end of the response which could then be parsed by the front-end and the record function will be activated.</p>
+<p>So after learning all of this I decided to experiment with this system in the receptionist project. The default way to interact with ChatScript is to run it’s pre-built server binaries and send queries via TCP connection (where connection is terminated after each query). This took a while to get correct since in the manuals they say the protocol for requests is three null-terminated strings (user name, bot name, query string) OR use the ASCII value for 1 in place of the first two null-terminating zeros. I opted for the second option but for some reason it was just not working. I finally got it working with the first option by manually appending zeros on the end like so:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp">byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>userBytes<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> userBytes<span class="token punctuation">.</span>Length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span><span class="token keyword">new</span>  <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token punctuation">{</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>botBytes<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> botBytes<span class="token punctuation">.</span>Length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span><span class="token keyword">new</span>  <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token punctuation">{</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>queryBytes<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> queryBytes<span class="token punctuation">.</span>Length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>Later on during experimentation, it was suggested to me that it was possible to compile the ChatScript C++ code into a native DLL which would allow me to use ChatScript without the need for a separate server. This seemed like a fun challenge and would be beneficial to the final product so I spent a few days trying this out. In the end I successfully compiled a DLL which could be used in Unity via P/Invoke. The code and instructions on doing this can be found in this repository: <a href="https://github.com/zacbrannelly/UnityChatScript">https://github.com/zacbrannelly/UnityChatScript</a></p>
+<p>Since I wasn’t sure on which system I wanted to use for Jenny’s “brain” I implemented an architecture that allowed me to easily switch between the two. I created an abstract class called <code>IChatService</code> (was originally an interface haha) which looked like so:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">IChatService</span> <span class="token punctuation">:</span> MonoBehaviour
+<span class="token punctuation">{</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">void</span> <span class="token function">SendQueryAsync</span><span class="token punctuation">(</span><span class="token keyword">string</span> text<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">string</span> <span class="token function">TakeResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">string</span> <span class="token function">PeekResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> ChatServiceResponse <span class="token function">TakeFullResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> ChatServiceResponse <span class="token function">PeekFullResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">bool</span> HasResponse <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>Then I created a singleton class called <code>ChatServiceManager</code> which holds an instance of <code>IChatService</code>. This class is then used everywhere user text input is sent to the “brain” for an intelligent response.</p>
 <h3 id="slack-api">Slack API</h3>
+<p><img src="http://www.stickpng.com/assets/images/5900c77916ae4b3fc58f4823.png" alt="" height="50"><br>
+It was hinted to me by my supervisor that a potential cool feature we could have for Jenny is the ability to send Slack messages to staff, especially when a visitor has arrived at the door. So to prepare for this possibility I did research on creating Slack bots and sending messages programmatically.</p>
+<p>After some research, it seemed the easiest way to create a Slack bot would be to use a Node.js server since there is a lot of documentation on this as well as there is a Slack API Node.js plugin. So to make it easier to transfer this server from my workstation to the Kisok machine, I created a Docker container with all the necessary dependencies installed. I then setup a test Slack workspace and created the <code>Virtual Receptionist</code> Slack bot in this work-space (which gives us the API access key needed to interact with the Slack REST API). I then moved on to creating very simple Web API endpoints in the Node.js server which could easily be used by the Unity application to interact with Slack. In the end, the following endpoints were created:</p>
+<ul>
+<li>GET <code>/send_message?userName=zac.brannelly&amp;message=Hello</code> - Sends a direct message to the user from the bot.</li>
+<li>GET <code>/send_message?channelName=visitors&amp;message=Zac Brannelly is here!</code> - Sends a message to the channel from the bot.</li>
+<li>GET <code>/list_users</code> - Returns a list of all the Slack users (and their complete information) in the work-space the bot is attached to (in JSON format)</li>
+</ul>
+<p>This was the first time I had ever worked with Node.js and it turned out to be very easy to get started with and very useful. I look forward to using it again.</p>
 <h3 id="voice-activity-detection">Voice Activity Detection</h3>
 <h2 id="planning">Planning</h2>
 <h2 id="implementation">Implementation</h2>
