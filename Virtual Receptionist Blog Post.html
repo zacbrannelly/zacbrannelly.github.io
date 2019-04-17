@@ -1,0 +1,325 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Receptionist Blog Post</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h1 id="jenny---the-virtual-receptionist">Jenny - The Virtual Receptionist</h1>
+<p>My name is Zac Brannelly, and I will be discussing the research, planning, and development of the Virtual Receptionist project at the Applied Artificial Intelligence Institute at Deakin University. Where the end result looks as follows and is ran on a kiosk, provided by our research partner Neo Products, placed in front of the doors at our office.</p>
+<p><img src="https://lh3.googleusercontent.com/LIXGkym0ePNh80iuyd2NWnKbTu3-98U39ee5ggNyp07fGj8_YoWW0o107Cl1Prgl3jgpYm-9bRF-=s800" alt="enter image description here"><br>
+<em>Figure 1: Final look of the Virtual Receptionist project</em></p>
+<h2 id="my-origin-story">My Origin Story</h2>
+<p>I am here completing my IBL (Industry-based learning) placement from Swinburne University of Technology, where I’m enrolled in my third year of a Bachelors of Computer Science. So this project had begun development before I actually started working here. The original reason I was offered a placement interview (then position) was because of my experience working with the Unity game engine (which is the tool being used to develop the project).</p>
+<p>So when I arrived at the start of January 2019, the prototype being developed by the summer intern over the holidays was already capable of using the webcam connected to the kiosk to perform face detection and recognition as well as show an animated avatar.</p>
+<p><img src="https://lh3.googleusercontent.com/7ROfyqtT2TEBo4RKKAE1oqsZspIQX2laXFLbDFLOH-tdHdc0AAU_qHC6ihrB6S7z5OZlq4uHPFsP=s800" alt="Original Prototype" title="Prototype"><br>
+<em>Figure 2: Screen capture of the prototype when I arrived</em></p>
+<p>As you can see above, it was very limited in capability, where it could only recognize people manually registered into a folder on disk, and it was able to use Windows text-to-speech to say "Hello and “Goodbye” when a user was recognized and lost respectively. So I was put to the task of making her being able to have a conversation with the user.</p>
+<h2 id="exploration--experimentation">Exploration / Experimentation</h2>
+<p>Before I could begin implementing her “brain” and allow the user to be able to converse with Jenny, I first needed to explore and experiment with the current available technologies that would allow me to pull off such a feat. For this to work, I needed Jenny to be able to accomplish three things:</p>
+<ol>
+<li>Intelligent response to user input (the “brain”, chat-bot service)</li>
+<li>Speech Recognition (speech-to-text)</li>
+<li>Speech (text-to-speech)</li>
+</ol>
+<p>Where the hardest of the three is the actual “brain”. Since at this point of the project, the ultimate goal was to create a receptionist who was engaging and “fun” to talk to, as well as being able to understand human input and come up with appropriate responses, no matter how the user worded their input. To be able to achieve that last part we will need to use a Natual Language Processing (NLP) technique. NLP is a field in Artificial Intelligence where the main focus is being able to analyze and understand human readable text. Initially I had no idea how this was possible, so I was directed to Google Cloud by my supervisor (Scott Barnett).</p>
+<h3 id="google-cloud-apis">Google Cloud APIs</h3>
+<p>Google provides a wide range of cloud services that makes it much easier to implement powerful features including NLP, Speech-to-text and Text-to-speech.</p>
+<h4 id="dialogflow">Dialogflow</h4>
+<p><img src="https://upload.wikimedia.org/wikipedia/en/thumb/c/c7/Dialogflow_logo.svg/1280px-Dialogflow_logo.svg.png" alt="" height="50"></p>
+<p>Dialogflow is a Google-owned service that specializes in building chat-bots that utilize NLP to understand the users intent, extract useful information and respond accordingly. This service is most commonly used to create bots that can perform certain actions such as booking flights entirely via natural language (text input or even speech). Since it is hosted on Google servers, it is capable of scaling to millions of users easily.</p>
+<p>This service seemed to fit the bill in terms of what the receptionist project needed. So I dug deeper into how this service works and whether it could be used in Unity. So first I researched how to create a basic bot that can say hello. Creating a bot is actually quite simple, all it requires is having a Google Cloud account. The actual creation of the bot (including creating its knowledge) is all done in-browser with a simple user-interface.</p>
+<p>Once the bot is created you then need to create an <strong>Intent</strong>. Intent is probably the most important keyword when talking about Dialogflow. An intent is an action or topic that the user is intending to activate. So when the user says something that fits the description of the intent, Dialogflow will activate that intent and return the response detailed in the intent’s settings. When creating an intent, you need to provide a name for the intent as well as a range of phrases that you believe should activate the intent, Dialogflow will use these phrases to train the bot in recognizing the intent. The more training phrases provided, the more likely Dialogflow will correctly match the intent. For example, to create an intent that would match with the user asking for help you could use the following phrases:</p>
+<p><img src="https://lh3.googleusercontent.com/d8iwPMvsqjNms7XHQjpKlY4bHLbUKjw-ivtuTNANOWJstSLJiYXUKWVVbG9Q_m7YxXDwZc9DgkWW=s700" alt="enter image description here"><br>
+<em>Figure 3: Example training phrases for an intent in Dialogflow</em></p>
+<p>Once you have trained the intent, you can provide a range of appropriate responses if this intent is activated. Dialogflow will randomly select one of these responses and return it to the user. Using this knowledge it is already possible to make a basic chat bot that can respond to simple phrases. The next question I was asking myself was “That’s great, but how do I get the bot to recognize information and regurgitate that back to the user?”</p>
+<p>This is where the concept of an <strong>Entity</strong> comes in to play. I think of entities as categories of information. For example a name can be considered an entity. They are defined much like intents where you provide a name for the entity and then a range of possible values for said entity. Then for each possible value you can provide synonyms to further help training the bots perception of that entity. Dialogflow also comes with many built-in entities that can be used straight away, one of these is called <code>@sys.given-name</code> which is used to match the first name of users. You then need to ensure, when training an intent, that the example phrase word that would be matched with an entity is highlighted like so:</p>
+<p><img src="https://lh3.googleusercontent.com/WeKrmtD2RP3iAtPAvIHcFpB3cZMfPmGL4n1tK9KwPpFGliOOp9lbczUomwm7dCXlusqVk-SDrHBc=s500" alt="enter image description here"><br>
+<em>Figure 4: Using entities in intent training</em></p>
+<p>You then can use the <code>$</code> prefix in the responses section to include the entity in the response of the bot. The following example would include the name of the user (given it was provided by them in the input that activated this intent) in the response.</p>
+<p><img src="https://lh3.googleusercontent.com/xSD38_-qipH0DdL6dFH1_RUtB8j0ytLs32Ol3FZhRppOvVXwICQ-mrko_1o07sl2-TXIpR72RPr8=s500" alt=""><br>
+<em>Figure 5: Using the resolved value of the given-name entity in the response of the bot</em></p>
+<p>So now it is possible to make a “parrot” bot which can regurgitate information that it is told. Great. For the purposes of getting a demo together as quick as possible, I chose to stop research on how Dialogflow bots are created and focused more on how they are integrated into applications.</p>
+<p>The initial challenge with implementing a Dialogflow bot into the project was even though Unity uses C# as the scripting language and Dialoglfow has a client library written in C#, the runtime version Unity uses by default is unsupported by the client library. Only recently has Unity allowed the use of higher versions of the .NET runtime which the client libraries need. Since I had been using Unity the previous year when that wasn’t possible (and it was very annoying) I wasn’t immediately aware and decided to try and interact with Dialogflow using it’s RESTful API. After wrestling with that for a couple days, mainly having issues due to getting authentication right, I found out that the C# runtime version could be changed in Unity and imported the client library into the project.</p>
+<p>From here on, the biggest challenge was <em>again</em> getting authentication working since following the tutorials for the client library, they tell you to use the <code>GOOGLE_APPLICATION_CREDENTIALS</code> environment variable to set the path to a JSON file containing the private key for your account. So that when you use the client library your credentials will be automatically loaded from there. This does not work as well as they think it does, for reasons beyond my knowledge I could not get the client library to authenticate from my environment variable. Either way this is not favorable because when being deployed, I don’t want to have to manually set the environment variable (or automatically edit environment variables via script which is just unnecessary). Information on alternative authentication methods was not as easy to find and took a while to get right, so for anyone who needs to use a Google Cloud service, here is how I got authentication working:</p>
+<ol>
+<li>Create a Service Account in the Google Cloud Console.</li>
+<li>Ensure this account has the correct permissions to use Dialogflow.</li>
+<li>Download a JSON file containing the credentials for the Service Account.</li>
+<li>Put this file in the <code>Resources/credentials</code> folder (non-Unity apps just put it somewhere in the project files)</li>
+<li>Then use the following code to initialize the client library:<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">using</span> Grpc<span class="token punctuation">.</span>Core<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Grpc<span class="token punctuation">.</span>Auth<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Google<span class="token punctuation">.</span>Apis<span class="token punctuation">.</span>Auth<span class="token punctuation">.</span>OAuth2<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Google<span class="token punctuation">.</span>Cloud<span class="token punctuation">.</span>Dialogflow<span class="token punctuation">.</span>V2<span class="token punctuation">;</span>
+
+<span class="token comment">// Load credentials JSON file to a string </span>
+<span class="token keyword">var</span> jsonCred <span class="token operator">=</span> Resources<span class="token punctuation">.</span><span class="token generic-method function">Load<span class="token punctuation">&lt;</span>TextAsset<span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token string">"credentials/dialogflow"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">if</span> <span class="token punctuation">(</span>jsonCred <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+	<span class="token comment">// Create credentials from file then create a channel</span>
+	<span class="token keyword">var</span> credentials <span class="token operator">=</span> GoogleCredential<span class="token punctuation">.</span><span class="token function">FromJson</span><span class="token punctuation">(</span>jsonCred<span class="token punctuation">.</span>text<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	<span class="token comment">// Create a session with Dialogflow using the channel</span>
+	<span class="token keyword">var</span> channel <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Channel</span><span class="token punctuation">(</span>
+			SessionsClient<span class="token punctuation">.</span>DefaultEndpoint<span class="token punctuation">.</span><span class="token function">ToString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> 
+			credentials<span class="token punctuation">.</span><span class="token function">ToChannelCredentials</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	_client <span class="token operator">=</span> SessionsClient<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span>channel<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">else</span>
+	Debug<span class="token punctuation">.</span><span class="token function">LogError</span><span class="token punctuation">(</span><span class="token string">"Failed to load credentials for dialog flow!"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+</li>
+</ol>
+<p>Once authentication was successful, sending queries to the Dialogflow bot was a simple function call that looks like so:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">var</span> query <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">QueryInput</span>
+<span class="token punctuation">{</span>
+	Text <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">TextInput</span>
+	<span class="token punctuation">{</span>
+		Text <span class="token operator">=</span> text<span class="token punctuation">,</span>
+		LanguageCode <span class="token operator">=</span> <span class="token string">"en-US"</span>
+	<span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">var</span> response <span class="token operator">=</span> <span class="token keyword">await</span> _client<span class="token punctuation">.</span><span class="token function">DetectIntentAsync</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">SessionName</span><span class="token punctuation">(</span><span class="token string">"agent-name"</span><span class="token punctuation">,</span> <span class="token string">"session-name"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+Debug<span class="token punctuation">.</span><span class="token function">Log</span><span class="token punctuation">(</span><span class="token string">"Got response: "</span> <span class="token operator">+</span> response<span class="token punctuation">.</span>QueryResult<span class="token punctuation">.</span>FulfillmentText<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>Then from the <code>response</code> object we can get lots more information than just the text response such as the name of the intent matched (accessible via <code>response.QueryResult.Intent.DisplayName</code>) and recognized entities (accessible via <code>response.QueryResult.Parameters.Fields["given-name"].StringValue</code>).</p>
+<p>One final question that was still on my mind was “Alright, how about when something happens, like the user leaving, I would want her to say something even though the user sent nothing”. The quick hacky fix for this would just have intents for hello and goodbye and send a message manually that would match with those intents. But this didn’t feel like a good solution, so I did a bit more research and found <strong>Events</strong>. Events are just string values attached to intents which activate the intent when sent via the client library. This is how an event is sent using the library:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">var</span> query <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">QueryInput</span>
+<span class="token punctuation">{</span>
+	Event <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">EventInput</span>
+	<span class="token punctuation">{</span>
+		LanguageCode <span class="token operator">=</span> <span class="token string">"en-US"</span><span class="token punctuation">,</span>
+		Name <span class="token operator">=</span> <span class="token string">"EVENT_NAME_HERE"</span><span class="token punctuation">,</span>
+	<span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">var</span> response <span class="token operator">=</span> <span class="token keyword">await</span> _client<span class="token punctuation">.</span><span class="token function">DetectIntentAsync</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">SessionName</span><span class="token punctuation">(</span><span class="token string">"agent-name"</span><span class="token punctuation">,</span> <span class="token string">"session-name"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+Debug<span class="token punctuation">.</span><span class="token function">Log</span><span class="token punctuation">(</span><span class="token string">"Got response: "</span> <span class="token operator">+</span> response<span class="token punctuation">.</span>QueryResult<span class="token punctuation">.</span>FulfillmentText<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>You could also send information such as the users name in the <code>Parameters</code> of the event like so:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp">query<span class="token punctuation">.</span>Event<span class="token punctuation">.</span>Parameters<span class="token punctuation">.</span>Fields<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span><span class="token string">"given-name"</span><span class="token punctuation">,</span> <span class="token string">"Zac"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>So using all the information I have learnt from research, I chucked together a small demo which could greet the user on arrival and respond to basic phrases such as “Hello” and “How are you?” that could be sent to the bot via text input.<br>
+This demo looked like so:</p>
+<p><img src="https://lh3.googleusercontent.com/IJO6H1ht2k_xLX-gG9czdtum3BGBzsgLpZM-xKo7T10tLbiRkdIm20GmKp2x9fSvtjeUD-f7gHci=s800" alt="enter image description here"><br>
+<em>Figure 6: Screen capture of prototype that used Dialogflow for its “brain”</em></p>
+<h4 id="speech-to-text">Speech-to-text</h4>
+<p>Once the receptionist had a bit of a “brain” I decided to move on to speech recognition. Since the Kiosk has no keyboard, only a touchscreen, text input is more difficult. Hence the use of speech-to-text. Luckily the same technology used by Google’s Virtual Assistant for speech recognition is available for use as a Google Cloud API service. Also since it is a Google Cloud product, the client libraries for this service follow the same architecture, so authentication can follow the same process as described above!</p>
+<p>The initial challenge was recording audio from the Kiosk’s microphone in Unity and sending it in the correct format. Unity does provide a way of recording audio in the <code>Microphone</code> class but it encodes the data into an <code>AudioClip</code> which represents the signal as an array of floats with a range of <span class="katex--inline"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>[</mo><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mn>1</mn><mo>]</mo></mrow><annotation encoding="application/x-tex">[-1, 1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mopen">[</span><span class="mord">−</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right: 0.166667em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span></span>. Which is then only accessible after recording has finished. This is not ideal since the speech-to-text service needs the audio information encoded in PCM format (16-bit Integers) and we want to be able to stream the data so we can get interim results that can be displayed on th screen. Now that Unity supports a normal version of the .NET framework, I was able to import an audio library called <code>NAudio</code> which is commonly used with this service meaning a lot more support. Using this library also means we can stream audio data since when recording the library periodically calls a callback function with the new audio data encoded in PCM format.</p>
+<p>So with access to the client library as well as NAudio in the Unity project, I began implementing a demo that could perform speech recognition.</p>
+<p>Using this client library is a bit more involved than the Dialogflow one, it starts off similar where you have to create a client using a channel that is created from loading a credentials JSON file. Then to start an actual speech recognition request, we call the <code>StreamingRecognize</code> function. There are other ways of going about a request, there is also <code>Recognize</code> and <code>RecognizeAsync</code> that will attempt to recognize a <em>complete</em> sample of audio. But for this project I want to be able to continuously send audio and receive multiple results (since it looks cooler haha). So after getting a stream returned from the <code>StreamingRecognize</code> method we need to tell the service what format we will be sending data in as well as other settings we would like. Two important settings I would like to note are <code>InterimResults</code> and <code>SingleUtterance</code>. <code>InterimResults</code> when true allows us to receive results that aren’t considered correct but my be part of the final result. <code>SingleUtterance</code>, when true, tells the service that we only one result marked as “final” whereas when false it can return multiple “final” results which is not ideal. Another thing to note is <code>EnableAutomaticPunctuation</code> is a really good feature that is still in BETA so you need to use the BETA version of the client libraries to gain access to it.</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token comment">// Get channel same way we get channel for Dialogflow </span>
+<span class="token comment">// ....</span>
+_client <span class="token operator">=</span> SpeechClient<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span>channel<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// Create recognition stream </span>
+_recogStream <span class="token operator">=</span> _client<span class="token punctuation">.</span><span class="token function">StreamingRecognize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// Send initial audio configuration </span>
+<span class="token keyword">await</span> _recogStream<span class="token punctuation">.</span><span class="token function">WriteAsync</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">StreamingRecognizeRequest</span>
+<span class="token punctuation">{</span>
+    StreamingConfig <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">StreamingRecognitionConfig</span>
+    <span class="token punctuation">{</span>
+        Config <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">RecognitionConfig</span>
+        <span class="token punctuation">{</span>
+            EnableWordTimeOffsets <span class="token operator">=</span> <span class="token keyword">false</span><span class="token punctuation">,</span>
+            Encoding <span class="token operator">=</span> RecognitionConfig<span class="token punctuation">.</span>Types<span class="token punctuation">.</span>AudioEncoding<span class="token punctuation">.</span>Linear16<span class="token punctuation">,</span>
+            LanguageCode <span class="token operator">=</span> <span class="token string">"en-AU"</span><span class="token punctuation">,</span>
+            SampleRateHertz <span class="token operator">=</span> <span class="token number">16000</span><span class="token punctuation">,</span>
+            EnableAutomaticPunctuation <span class="token operator">=</span> <span class="token keyword">true</span>
+        <span class="token punctuation">}</span><span class="token punctuation">,</span>
+        InterimResults <span class="token operator">=</span> <span class="token keyword">true</span><span class="token punctuation">,</span>
+        SingleUtterance <span class="token operator">=</span> <span class="token keyword">true</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>This function below is the callback function that gets executed by NAudio when new audio data is available for processing. In here we just need to send another <code>StreamingRecognizeRequest</code> to the stream, but this time we just set the <code>AudioContent</code> property with the encoded PCM data.</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token comment">// Callback function called by NAudio when new audio data is available</span>
+<span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">OnRecordingDataRecv</span><span class="token punctuation">(</span><span class="token keyword">object</span> sender<span class="token punctuation">,</span> NAudio<span class="token punctuation">.</span>Wave<span class="token punctuation">.</span>WaveInEventArgs args<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+	<span class="token comment">// Send new audio data to speech-to-text</span>
+	_recogStream<span class="token punctuation">.</span><span class="token function">WriteAsync</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">StreamingRecognizeRequest</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+	    AudioContent <span class="token operator">=</span> Google<span class="token punctuation">.</span>Protobuf<span class="token punctuation">.</span>ByteString<span class="token punctuation">.</span><span class="token function">CopyFrom</span><span class="token punctuation">(</span>args<span class="token punctuation">.</span>Buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> args<span class="token punctuation">.</span>BytesRecorded<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">Wait</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>This lambda function below is called in a separate background thread and is responsible for getting the interim results from the recognition stream and put them into a queue. This queue is then taken from in another class where the results are put into the text field seen in Figure 6. The results are only sent to the Dialogflow bot once the <code>IsFinal</code> flag is set.</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token comment">// Continuously check for new results and add them to the result queue</span>
+<span class="token keyword">await</span> System<span class="token punctuation">.</span>Threading<span class="token punctuation">.</span>Tasks<span class="token punctuation">.</span>Task<span class="token punctuation">.</span><span class="token function">Run</span><span class="token punctuation">(</span><span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> 
+<span class="token punctuation">{</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token keyword">await</span> _recogStream<span class="token punctuation">.</span>ResponseStream<span class="token punctuation">.</span><span class="token function">MoveNext</span><span class="token punctuation">(</span><span class="token keyword">default</span><span class="token punctuation">(</span>System<span class="token punctuation">.</span>Threading<span class="token punctuation">.</span>CancellationToken<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">var</span> response <span class="token operator">=</span> _recogStream<span class="token punctuation">.</span>ResponseStream<span class="token punctuation">.</span>Current<span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>response<span class="token punctuation">.</span>Results<span class="token punctuation">.</span>Count <span class="token operator">&gt;</span> <span class="token number">0</span><span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            _resultQueue<span class="token punctuation">.</span><span class="token function">Enqueue</span><span class="token punctuation">(</span>response<span class="token punctuation">.</span>Results<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>Alternatives<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>Transcript<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>response<span class="token punctuation">.</span>Results<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>IsFinal<span class="token punctuation">)</span>
+            <span class="token punctuation">{</span>
+                _isFinal <span class="token operator">=</span> <span class="token keyword">true</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<h4 id="text-to-speech">Text-to-speech</h4>
+<p>Now that she has a “brain” and can understand human speech, we need her to be able to respond in a human voice. The first prototype that was developed before I arrived was capable of text-to-speech but it used Windows Voice to accomplish this. The quality of Windows Voice is not of a high standard and sounds more like a robot than it does human. Thankfully Google provides a text-to-speech cloud API service which uses the latest technology in speech synthesis called Wavenet. Whats even better is you can set the voice to have an accent relative to your location. So we can get her saying “G’day” the correct way haha.</p>
+<p>So since this is another Google Cloud product, the client library follows the same architecture as the last two where the actual conversion takes place with one function call to <code>SynthesizeSpeechAsync</code> as shown below. As you can see the name of the voice is <code>en-AU-Wavenet-C</code>, this tells the service to use a Wavenet voice that has been trained on female Australian voices.</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token comment">// Create channel using same method from Dialogflow</span>
+_client <span class="token operator">=</span> TextToSpeechClient<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span>channel<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">var</span> request <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">SynthesizeSpeechRequest</span>
+<span class="token punctuation">{</span>
+    Input <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">SynthesisInput</span>
+    <span class="token punctuation">{</span>
+        Text <span class="token operator">=</span> text
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    AudioConfig <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">AudioConfig</span>
+    <span class="token punctuation">{</span>
+        AudioEncoding <span class="token operator">=</span> AudioEncoding<span class="token punctuation">.</span>Linear16<span class="token punctuation">,</span>
+        SampleRateHertz <span class="token operator">=</span> <span class="token number">16000</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    Voice <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">VoiceSelectionParams</span>
+    <span class="token punctuation">{</span>
+        LanguageCode <span class="token operator">=</span> <span class="token string">"en-AU"</span><span class="token punctuation">,</span>
+        Name <span class="token operator">=</span> <span class="token string">"en-AU-Wavenet-C"</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">var</span> response <span class="token operator">=</span> <span class="token keyword">await</span> _client<span class="token punctuation">.</span><span class="token function">SynthesizeSpeechAsync</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>The biggest challenge when it comes to implementing this client library into Unity was converting the received audio data into a format that could be used by Unity to play the voice. The service returns the audio data in WAV format (PCM) and since there is no API provided by Unity to load WAV data at runtime we need to do this manually. So I did a lot of research into the WAV format (mainly here: <a href="http://soundfile.sapp.org/doc/WaveFormat/">http://soundfile.sapp.org/doc/WaveFormat/</a>) and after sifting through a lot of Stackoverflow posts I was able to load the audio data into an <code>AudioClip</code> and play it to the user. So for anyone who might be in a similar situation, here is how I accomplished that:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">private</span> AudioClip <span class="token function">ConvertResponseToClip</span><span class="token punctuation">(</span>SynthesizeSpeechResponse response<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token comment">// Get the WAV data from the response</span>
+    <span class="token keyword">var</span> stream <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">MemoryStream</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    response<span class="token punctuation">.</span>AudioContent<span class="token punctuation">.</span><span class="token function">WriteTo</span><span class="token punctuation">(</span>stream<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Read number of channels into a buffer</span>
+    <span class="token keyword">var</span> buffer <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    stream<span class="token punctuation">.</span><span class="token function">Seek</span><span class="token punctuation">(</span><span class="token number">22</span><span class="token punctuation">,</span> SeekOrigin<span class="token punctuation">.</span>Begin<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    stream<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	<span class="token comment">// Convert buffer into integer for number of channels</span>
+    <span class="token keyword">var</span> numChannels <span class="token operator">=</span> BitConverter<span class="token punctuation">.</span><span class="token function">ToInt16</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Read sample rate directly after into the buffer</span>
+    buffer <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    stream<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	<span class="token comment">// Get sample rate from the buffer</span>
+    <span class="token keyword">var</span> sampleRate <span class="token operator">=</span> BitConverter<span class="token punctuation">.</span><span class="token function">ToInt32</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Read the number of bytes in the data section of the wave file</span>
+    stream<span class="token punctuation">.</span><span class="token function">Seek</span><span class="token punctuation">(</span><span class="token number">40</span><span class="token punctuation">,</span> SeekOrigin<span class="token punctuation">.</span>Begin<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    stream<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Calculate number of samples (dataSize = samples * channels * 2)</span>
+    <span class="token comment">// So "number of samples" = dataSize / (channels * 2)  </span>
+    <span class="token keyword">var</span> samples <span class="token operator">=</span> BitConverter<span class="token punctuation">.</span><span class="token function">ToInt32</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token number">2</span> <span class="token operator">*</span> numChannels<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Seek to the start of the data section</span>
+    stream<span class="token punctuation">.</span><span class="token function">Seek</span><span class="token punctuation">(</span><span class="token number">44</span><span class="token punctuation">,</span> SeekOrigin<span class="token punctuation">.</span>Begin<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">var</span> data <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">float</span><span class="token punctuation">[</span>samples<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    buffer <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+	
+	<span class="token comment">// Load the samples into a buffer and convert to a normalized float</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> samples<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+        stream<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        data<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> BitConverter<span class="token punctuation">.</span><span class="token function">ToInt16</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token keyword">float</span><span class="token punctuation">)</span><span class="token keyword">short</span><span class="token punctuation">.</span>MaxValue<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// Create a clip and set the data </span>
+    <span class="token keyword">var</span> clip <span class="token operator">=</span> AudioClip<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span><span class="token string">"response"</span><span class="token punctuation">,</span> samples<span class="token punctuation">,</span> numChannels<span class="token punctuation">,</span> sampleRate<span class="token punctuation">,</span> <span class="token keyword">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    clip<span class="token punctuation">.</span><span class="token function">SetData</span><span class="token punctuation">(</span>data<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">return</span> clip<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>The main con to using this service over Windows Voice is the fact that the Google service operates on the cloud, so there is going to be a bigger delay when converting text into voice (especially when the internet is slow). To overcome this issue, I cache all new responses to disk, so that if they are used again the cached response is played rather than using the service again. This also saves money in the long run since Google Cloud Text-to-speech is not an entirely free service. The only con to this solution is disk usage but for the amount of different responses there will be I doubt it will take up much space.</p>
+<h3 id="open-question-answering">Open Question Answering</h3>
+<p>Now that the receptionist can perform basic “human” interaction with the user, it was time to look into making the receptionist seem a bit smarter. It was time to develop her brain further. This is where I was forwarded a paper by AI researchers at Facebook where they developed a system named DrQA.</p>
+<h4 id="drqa">DrQA</h4>
+<p><img src="https://github.com/facebookresearch/DrQA/raw/master/img/drqa.png" alt="" height="250"><br>
+AI researchers employed at Facebook wrote a paper called <a href="https://arxiv.org/abs/1704.00051">Reading Wikipedia to Answer Open-Domain Questions</a> in which they developed a system called DrQA which could use machine learning  techniques to first locate Wikipedia articles that may contain the answer to the question (Document Retriever) and then find the phrase most likely to be the answer (Document Reader). These two modules were trained on large QA data-sets making the system sometimes very accurate.</p>
+<p>The first challenge on exerimenting with this project was actually getting it to run. I initially assumed this would be possible to run on a regular machine since there was no obvious warning in the README of the project. But after attempting to run the project on an Apple Mac Mini (since Windows was clearly not supported) I came to realization that it was running out of RAM. So I found a cloud service that was free to use through my University credentials and created a machine with over 50GB of RAM and 100GB of storage space, just to be sure haha. I was then finally able to install all the right dependencies, download a cache of the entire Wikipedia database from 2016 and run the interactive demo.</p>
+<p>Here I could experiment with what questions it was really good or bad at answering. Sometimes it was suprisingly accurate, for example when asking “Where is Batman?” it would return with “Gotham City”. But then other times it was off quite a bit, for example when asking “How many legs does a dog have?” it would come back with “Eight”.</p>
+<p><img src="https://i.pinimg.com/originals/d1/7a/df/d17adfd145f072fc8874d4ab73c209b8.jpg" alt=""><br>
+<em>Figure 7: Dogs according to DrQA</em></p>
+<p>Even after increasing the amount of documents it looks at for an answer it still was off with an answer of “Five”. But at least it was improving! So I decided to try and get this system into the “brain” of the receptionist. Obviously this couldn’t be added to the project directly since it can’t operate on Windows and it uses over 16GB of RAM, so next option was to create a web-server that would receive questions as HTTP POST requests and put the answer in the response (formatted in JSON).  The code and instructions on how to set up the web-server used can be found in this repository: <a href="https://github.com/zacbrannelly/drqa-server">https://github.com/zacbrannelly/drqa-server</a>.</p>
+<p>A POST request to the web-server with the form field <code>question=Where is Batman?</code> would eventually return the response:</p>
+<pre class=" language-json"><code class="prism  language-json"><span class="token punctuation">{</span>
+	<span class="token string">"question"</span><span class="token punctuation">:</span> <span class="token string">"Where is Batman?"</span><span class="token punctuation">,</span>
+	<span class="token string">"answer"</span><span class="token punctuation">:</span> <span class="token string">"Gotham City"</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>Therefore in the Unity project all I needed to do was POST the data to the web-server, wait for the response, then get the receptionist to say the answer when it is received. This would occur when the user activated the <code>Question</code> intent (which could be activated by saying “Can I ask you a question?”), if this intent was detected, then the next input by the user would be sent to DrQA as a question instead of to the Dialogflow bot.</p>
+<p>The main issue with this system is sometimes it would take over 20 seconds to get a response from the server. So to fill in the time, I made the head of the receptionist spin like it was possessed until the response was received :)</p>
+<p><img src="https://lh3.googleusercontent.com/JWTzt9sHofxBKP4VHDBIh9mRpgbmeFIDPc-JlrC6NpFVcTNLn8QqGtHt7CmT9EnJMbUQmje0UlaC=s500" alt="enter image description here"><br>
+<em>Figure 8: GIF of Receptionist that has been possessed (lighting changed for dramatic purposes)</em></p>
+<h4 id="duck-duck-go-instant-api">Duck Duck Go Instant API</h4>
+<p><img src="https://upload.wikimedia.org/wikipedia/en/thumb/8/88/DuckDuckGo_logo.svg/1200px-DuckDuckGo_logo.svg.png" alt="" height="200"><br>
+Since the DrQA system requires a lot of RAM and storage space and it must be on a separate machine to the Kiosk, it is not the most cost-effective version of question answering (since we have to pay for the server time). For this reason I looked around for already existing API’s that answer questions. I came across Duck Duck Go Instant Answer API which allows you to send queries to a web endpoint and it will return a JSON document containing an Abstract (summary of the topic or question). It also contains other information such as a link to an image that relates to the topic/answer.</p>
+<p>For example if you ask “What is Apple?” you get the following response (simplified):</p>
+<pre class=" language-json"><code class="prism  language-json"><span class="token punctuation">{</span>
+	<span class="token operator">...</span>
+	<span class="token string">"ImageWidth"</span><span class="token punctuation">:</span> <span class="token number">270</span><span class="token punctuation">,</span>
+	<span class="token string">"ImageHeight"</span> <span class="token punctuation">:</span> <span class="token number">270</span><span class="token punctuation">,</span>
+	<span class="token string">"Image"</span> <span class="token punctuation">:</span> <span class="token string">"https://duckduckgo.com/i/14b55389.jpg"</span><span class="token punctuation">,</span>
+	<span class="token string">"AbstractText"</span><span class="token punctuation">:</span> <span class="token string">"An apple is a sweet, edible fruit produced by... (continued)"</span><span class="token punctuation">,</span>
+	<span class="token operator">...</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>Use <a href="https://api.duckduckgo.com/?q=What%20is%20Apple&amp;format=json&amp;pretty=1">https://api.duckduckgo.com/?q=What%20is%20Apple&amp;format=json&amp;pretty=1</a> to see the full response.</p>
+<p>So I decided to implement this as a backup to when we don’t have a server running  for DrQA. As a bonus I used the image link  that is sometimes provided to be shown in a dialog on the screen like so:<br>
+<img src="https://lh3.googleusercontent.com/QhYZSKoqpoedH-zyiP3rgCPA91WkCGd28STOM4INki1QrJwtaw_W2ttKff6LxNkAJVbc3T9gsI-2=s500" alt="enter image description here"><br>
+<em>Figure 9: Dialog box showing image of an apple after asking “What is apple?”</em></p>
+<h3 id="chatscript">ChatScript</h3>
+<p>After using Dialogflow for a few weeks, another project was being developed which was very similar to this project where the application was being made in Unity and involved communicating to a virtual avatar via speech input. They had elected to use an open-source chat-bot engine called ChatScript to handle the “brain” of the avatar. So I decided to look into how it works and whether it would be a better alternative to Dialogflow.</p>
+<p>ChatScript works a little different to Dialogflow since, as the name suggests, it uses scripts to determine the response to text input. These scripts are written in a custom language called ChatScript (duh) which looks like so:</p>
+<pre><code>topic: ~food []
+
+#! I like spinach
+s: ( I like spinach ) Are you a fan of the Popeye cartoons?
+	
+	a: ( ~yes )  I used to watch him as a child. Did you lust after Olive Oyl?
+    	    b: ( ~no ) Me neither. She was too skinny.
+    	    b: ( yes ) You probably like skinny models.
+	
+	a: ( ~no ) What cartoons do you watch?
+     		b: ( none ) You lead a deprived life.
+     		b: ( Mickey Mouse ) The Disney icon.
+
+#! I often eat chicken
+u: ( ![ not never rarely ] I * ~ingest * ~meat ) You eat meat.
+
+#! I really love chicken
+u: ( !~negativeWords I * ~like * ~meat ) You like meat.
+
+#! do you eat bacon?
+?: ( do you eat _ [ ham eggs bacon] ) I eat '_0
+</code></pre>
+<p>Where the words/symbols in the brackets are patterns (think of them like regular expressions) which are used to match user input with responses that are positioned outside the brackets. The prefix before the pattern tells ChatScript what type of input should be checked against the pattern, where <code>s:</code> means statements, <code>?:</code> means questions and <code>u:</code> means both (union). So off the bat there is much more of a learning curve using ChatScript over Dialogflow. You have to first learn the syntax of the scripting language and then the syntax of the pattern expressions. It is a lot more challenging to match input with an intent since in Dialogflow you can just come up with  a few variations of input during the training phase.</p>
+<p>But it does come with some advantages…</p>
+<h3 id="slack-api">Slack API</h3>
+<h3 id="voice-activity-detection">Voice Activity Detection</h3>
+<h2 id="planning">Planning</h2>
+<h2 id="implementation">Implementation</h2>
+<h3 id="facial-recognition">Facial Recognition</h3>
+<h3 id="chat-bot-service-dialogflow--chatscript">Chat Bot Service (Dialogflow &amp; ChatScript)</h3>
+<h2 id="conclusion">Conclusion</h2>
+</div>
+</body>
+
+</html>
