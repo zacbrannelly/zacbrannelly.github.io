@@ -331,7 +331,8 @@ u: ( !~negativeWords I * ~like * ~meat ) You like meat.
 </code></pre>
 <p>The next advantage is the concept of out-of-band (OOB) data which is the ability to send &amp; receive data that isn’t human input. For example if we wanted ChatScript to know what state the system is currently in we could send the state name in OOB data format (<code>[state WaitingForUsers]</code>) where ChatScript could use the pattern <code>( &lt; \[ state _* \] )</code> (where the <code>_*</code> symbols means save the next word(s) into the <code>_0</code> variable) to match with that input and save the data inside. We can then save the new state to a variable (<code>$currentState = _0</code>) and then alter responses according to that variable. OOB data can also be put into responses from ChatScript which is useful when you want to activate a function or state in the front-end application. For example when the bot asks a question to the user we might want the receptionist to start recording automatically so we could add <code>[{ "command": "StartRecording" }]</code> to the end of the response which could then be parsed by the front-end and the record function will be activated.</p>
 <p>So after learning all of this I decided to experiment with this system in the receptionist project. The default way to interact with ChatScript is to run it’s pre-built server binaries and send queries via TCP connection (where connection is terminated after each query). This took a while to get correct since in the manuals they say the protocol for requests is three null-terminated strings (user name, bot name, query string) OR use the ASCII value for 1 in place of the first two null-terminating zeros. I opted for the second option but for some reason it was just not working. I finally got it working with the first option by manually appending zeros on the end like so:</p>
-<pre class=" language-csharp"><code class="prism  language-csharp">byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>userBytes<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> userBytes<span class="token punctuation">.</span>Length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">var</span> byteStream <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">MemoryStream</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>userBytes<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> userBytes<span class="token punctuation">.</span>Length<span class="token punctuation">)</span><span class="token punctuation">;</span>
 byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span><span class="token keyword">new</span>  <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token punctuation">{</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>botBytes<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> botBytes<span class="token punctuation">.</span>Length<span class="token punctuation">)</span><span class="token punctuation">;</span>
 byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span><span class="token keyword">new</span>  <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token punctuation">{</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -349,7 +350,7 @@ byteStream<span class="token punctuation">.</span><span class="token function">W
 	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">bool</span> HasResponse <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
 <span class="token punctuation">}</span>
 </code></pre>
-<p>Then I created a singleton class called <code>ChatServiceManager</code> which holds an instance of <code>IChatService</code>. This class is then used everywhere user text input is sent to the “brain” for an intelligent response.</p>
+<p>Then I created a singleton class called <code>ChatServiceManager</code> which holds an instance of <code>IChatService</code>. This class is then used everywhere user text input is sent to the “brain” for an intelligent response, where it will use the current <code>IChatService</code> instance set to <code>ChatServiceManager</code> to send a query.</p>
 <h3 id="slack-api">Slack API</h3>
 <p><img src="http://www.stickpng.com/assets/images/5900c77916ae4b3fc58f4823.png" alt="" height="50"><br>
 It was hinted to me by my supervisor that a potential cool feature we could have for Jenny is the ability to send Slack messages to staff, especially when a visitor has arrived at the door. So to prepare for this possibility I did research on creating Slack bots and sending messages programmatically.</p>
@@ -362,7 +363,7 @@ It was hinted to me by my supervisor that a potential cool feature we could have
 <p>This was the first time I had ever worked with Node.js and it turned out to be very easy to get started with and very useful. I look forward to using it again. It only took a few hours to get Slack messages successfully sent via these endpoints. So next I moved on to creating a demo using ChatScript where the user was able to ask Jenny to send a message to someone and she would ask for both the user’s name and the message. The Unity app would then use the <code>list_users</code> endpoint to get a list of the users actual names (first and/or last names) and try to match them with the name provided by the user, if it could then it would get that users Slack user name and then use the <code>send_message</code> endpoint to send the message. This worked well, accept for when the name was spelled wrong by speech-to-text. This is addressed later on in this post.</p>
 <h3 id="voice-activity-detection">Voice Activity Detection</h3>
 <p><img src="https://media1.tenor.com/images/50df8481e59d8c29ba4828d4cdcfa16f/tenor.gif?itemid=5308157" alt=""><br>
-<em>Figure 10: Me while researching this feature</em></p>
+<em>Figure 10: Me while researching/implementing this feature</em></p>
 <p>This is one of the biggest rabbit holes I fell down during the development of this project. The problem sounds like it would be easy to solve, “If the user starts speaking, start recording”, initial throughts are “Oh just start recording when the microphone picks up a slightly louder noise”, but then you start asking yourself what if the noise is just someone dropping a cup or somebody shouting from the other side of the office? So my next thought was I needed to find an accurate way of detecting voice and voice ONLY. After sifting through research papers and various Github projects, I stumbled upon a project called VadNet.</p>
 <p><a href="https://raw.githubusercontent.com/hcmlab/vadnet/master/pics/network.png">VadNet</a> is an open source model built using Tensorflow that detects speech using a 3-layer CNN that takes 1 second of audio input (48,000 normalized floats) and spits out two float values corresponding to noise and voice confidence respectively. Since it is a CNN, it is quite fast, so it is able to process audio in real-time, which is exactly what we need for this feature.<br>
 <img src="https://raw.githubusercontent.com/hcmlab/vadnet/master/pics/network.png" alt=""><br>
@@ -532,11 +533,251 @@ c. If the size of the <code>cache</code> is higher or equal to 48,000 (1 second)
 d. If the voice confidence value is higher than a certain threshold then increment <code>consecutiveCounter</code> and add the voice confidence and the starting index of the detection in the <code>cache</code> to the tuples list.<br>
 e. If voice confidence is lower than the threshold and <code>consecutiveCounter</code> is higher than a certain threshold then set it back to zero, find the tuple with the highest voice confidence, extract the samples from the <code>cache</code> using the cache index from the tuple (adding a second of padding), send the samples to speech-to-text, and clear the tuples.</li>
 </ol>
+<p>This algorithm worked well on my workstation. It however did not work so well on the Kiosk machine. Since this machine rocks a <em><strong>beastly</strong></em> Intel i3 CPU with two cores, it couldn’t handle both the facial recognition and voice activity detection while maintaining an acceptable frame rate. Making all of this work useless for this project until we upgrade the Kiosk machine. Lesson learned, consider the power of the production machine before implementing a feature.</p>
+<h3 id="acrcloud---audio-content-recognition">ACRCloud - Audio Content Recognition</h3>
+<p><img src="https://www.acrcloud.com/wp-content/uploads/2015/09/acrcloud-logo-website.png" alt=""><br>
+ACRCloud is an API service that allows you to send an audio signal for Audio Content Recognition, or in laymen terms “Shazam the song”. With over 68 million songs in their database I figured this would be a nice little gimmick the receptionist could do. It also turns out they have a SDK ready to go for Unity! So experimenting with this was easy from the get go. So I decided to create a new scene in Unity and implement a small demo that would start recording and send what ever it got for recognition to ACRCloud.</p>
+<p>So I first created a scene with a button labeled “Start Recording” and then created a component called <code>MusicRecognition</code>. In this class I create an instance of <code>ACRCloudRecognizer</code> which is from their Unity SDK. The constructor of the class  takes 3 strings, <code>host</code>, <code>access_key</code> and <code>access_secret</code> which you get when you create an account and project on the ACRCloud website. Then I created a <code>StartRecognition</code> method which configures and starts the recording of audio (using NAudio again). Then I created a <code>StopRecognition</code> method which takes all the audio recorded and sends it for recognition using the <code>Recognize</code> method of <code>ACRCloudRecognizer</code>. It does this in a background thread using <code>Task.Run()</code> since we don’t want to lock up Unity’s update thread. When it gets a result it puts it in a result queue. Results are returned in JSON, the data structures look like so:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token punctuation">[</span>System<span class="token punctuation">.</span>Serializable<span class="token punctuation">]</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">MusicRecognitionResult</span>
+<span class="token punctuation">{</span>
+	<span class="token punctuation">[</span>System<span class="token punctuation">.</span>Serializable<span class="token punctuation">]</span>
+	<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Status</span>
+	<span class="token punctuation">{</span>
+		<span class="token keyword">public</span> <span class="token keyword">string</span> msg<span class="token punctuation">;</span>
+		<span class="token keyword">public</span> <span class="token keyword">int</span> code<span class="token punctuation">;</span>
+		<span class="token keyword">public</span> <span class="token keyword">string</span> version<span class="token punctuation">;</span>
+	<span class="token punctuation">}</span>
+
+	<span class="token punctuation">[</span>System<span class="token punctuation">.</span>Serializable<span class="token punctuation">]</span>
+	<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Metadata</span>
+	<span class="token punctuation">{</span>
+		<span class="token punctuation">[</span>System<span class="token punctuation">.</span>Serializable<span class="token punctuation">]</span>
+		<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Music</span>
+		<span class="token punctuation">{</span>
+			<span class="token punctuation">[</span>System<span class="token punctuation">.</span>Serializable<span class="token punctuation">]</span>
+			<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Artist</span>
+			<span class="token punctuation">{</span>
+				<span class="token keyword">public</span> <span class="token keyword">string</span> name<span class="token punctuation">;</span>
+			<span class="token punctuation">}</span>
+
+			<span class="token punctuation">[</span>System<span class="token punctuation">.</span>Serializable<span class="token punctuation">]</span>
+			<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Album</span>
+			<span class="token punctuation">{</span>
+				<span class="token keyword">public</span> <span class="token keyword">string</span> name<span class="token punctuation">;</span>
+			<span class="token punctuation">}</span>
+
+			<span class="token keyword">public</span> Artist<span class="token punctuation">[</span><span class="token punctuation">]</span> artists <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+			<span class="token keyword">public</span> <span class="token keyword">string</span> title <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+			<span class="token keyword">public</span> <span class="token keyword">string</span> release_date <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+			<span class="token keyword">public</span> <span class="token keyword">string</span> label <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+			<span class="token keyword">public</span> <span class="token keyword">int</span> duration_ms <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+			<span class="token keyword">public</span> Album album <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+			<span class="token keyword">public</span> <span class="token keyword">string</span> acrid <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+			<span class="token keyword">public</span> <span class="token keyword">int</span> result_from <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+			<span class="token keyword">public</span> <span class="token keyword">int</span> score <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+		<span class="token punctuation">}</span>
+	
+		<span class="token keyword">public</span> Music<span class="token punctuation">[</span><span class="token punctuation">]</span> music <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+		<span class="token keyword">public</span> <span class="token keyword">string</span> timestamp_utc <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+	<span class="token punctuation">}</span>
+	
+	<span class="token keyword">public</span> Status status <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> Metadata metadata <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">double</span> cost_time <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">int</span> result_type <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>So as you can see we get a lot of information about the song if it can successfully recognize the audio.</p>
 <h2 id="planning">Planning</h2>
+<p>So after a busy couple months experimenting with different technologies needed for this project, it was time to start planning the actual implementation of the receptionist. After a meeting with Scott, we were able to narrow the scope of this project down to six workflows:</p>
+<ul>
+<li><strong>Registration</strong> - where the user’s face is sent for recognition, on failure consider the user a visitor and register their face along with their name in a database. Otherwise greet them with their recognized name.</li>
+<li><strong>Look Up</strong> - If the user is a visitor and is registered, ask them who they are here to see, why they are here and notify that staff member of this information via Slack.</li>
+<li><strong>Contact Staff</strong> - If the user requests to send a message, ask them for the message, who to send it to and send the message via Slack.</li>
+<li><strong>Open Door</strong> - Open the door for the user if recognized as  Staff.</li>
+<li><strong>Import Staff</strong> - Provide a means for the office to import staff faces into the system.</li>
+<li><strong>Remove User Information</strong> - Allow visitor users to ask for their face to be deleted from the database.</li>
+<li><strong>Entertainment</strong> - Allow the user to ask general questions and answer them via DrQA. Maybe also guess songs via ACRCloud if time allows.</li>
+</ul>
+<p>Using these workflows, I started compiling a Technical Specification, which outlined how the final system will be implemented. This included creating some wire frame designs of how the UI should look (or close to what it should look like). Here are some that were included:<br>
+<img src="https://lh3.googleusercontent.com/HdrwEOyQ_qaNgZLnVJH0SpbYx76cK3MrNY5X5aOyA0dv87ysOPiMrw2eUY-IKeYs3StZo7bQgXew=s750" alt=""><br>
+<em>Figure 12: Registration state where the user must enter their name</em></p>
+<p><img src="https://lh3.googleusercontent.com/e3YqaWjJ3ryACBw3SQTDOXM37SkeSavNoJZtFE0aFBpbS4A4giKg_KMpySh9BGj8NKWuu2nAu-NF=s700" alt="enter image description here"><br>
+<em>Figure 13: Contact Staff state where the user must pick the staff to contact</em><br>
+<img src="https://lh3.googleusercontent.com/z8BykJElzl1wPlR-tWi2Du7mWv0UA5QaZ8DXTnmH4OYQ9eGFtWCVcLn0J3ce5Hvd6oiJ8l16Du11=s700" alt="enter image description here"><br>
+<em>Figure 14: Waiting for input state where the user is speaking to the receptionist</em></p>
+<p>In this document I also decided on the type of architecture I would use for this project. I decided on using a Finite State Machine where each workflow is a separate state. This would allow me to separate the logic of each workflow into their own respective classes, making modification and maintainability much more easier. As well as making extension of the functionality much more easier (need to add another workflow? Just create another state). Below is the diagram describing how the state machine will be setup and when the state’s will interchange between each other.</p>
+<p><img src="https://lh3.googleusercontent.com/IDbBKU9C4ZaIKAyf2SDfVo6ONVqfryrQP4iR_bk62qbA-GyrdiUobIZTD4xgbE_pknO3Q33ICnc1=s900" alt="enter image description here"><br>
+<em>Figure 15: Overall Finite State Machine with transition rules shown</em></p>
 <h2 id="final-implementation">Final Implementation</h2>
 <h3 id="facial-recognition">Facial Recognition</h3>
-<h3 id="chat-bot-service-dialogflow--chatscript">Chat Bot Service (Dialogflow &amp; ChatScript)</h3>
+<h4 id="detection">Detection</h4>
+<p>The first stage in the facial recognition system is to detect faces. This is done locally in the front-end Unity application using a DNN Caffe model from OpenCV’s GitHub repository in the samples folder (can be found <a href="https://github.com/opencv/opencv/tree/master/samples/dnn">here</a>). So each frame we feed the webcam image through this network which outputs the position, size and confidence of faces detected in the image. This network is capable of detecting multiple faces, so we put limits on how big the face must be before we show a circle around the face in the webcam feed display. Each frame we compare the new faces with the faces detected in the previous frame, if a new and old face are of similar position and size then they are considered the same face. If a face is larger than a certain threshold and is larger than all other faces then this face is considered the <em>current</em> user and  a snapshot of this face is taken (cropped from the original feed image). This snapshot is then encoded into a PNG file and sent via HTTP POST to the facial recognition Docker container for recognition.</p>
+<h4 id="recognition">Recognition</h4>
+<p>This stage occurs entirely in a Docker container which hosts a web-server. This web-server is capable of the following using web end-points:</p>
+<ul>
+<li>POST <code>/</code> - Perform recognition on image posted under the name <code>file</code>. Returns a JSON document with the following schema:<pre class=" language-json"><code class="prism  language-json"><span class="token punctuation">{</span>
+	<span class="token string">"photoFilename"</span><span class="token punctuation">:</span> <span class="token string">"Zac Brannelly"</span><span class="token punctuation">,</span> <span class="token comment">// The name of the recognized user (if recognized)</span>
+	<span class="token string">"faceEncodings"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token number">0.2</span><span class="token punctuation">,</span> <span class="token number">0.1</span><span class="token punctuation">,</span> <span class="token number">0.5</span> <span class="token operator">...</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token comment">// Unique vector generated from face (if possible)</span>
+	<span class="token string">"authenticated"</span><span class="token punctuation">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span> <span class="token comment">// True if face is recognized, omitted otherwise </span>
+	<span class="token string">"isVisitor"</span><span class="token punctuation">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span> <span class="token comment">// True if the face recognized is registered as a visitor</span>
+	<span class="token string">"userID"</span><span class="token punctuation">:</span> <span class="token string">"ASKJDKASDJ.."</span> <span class="token comment">// ID of the recognized face in the database </span>
+<span class="token punctuation">}</span>
+</code></pre>
+</li>
+<li>POST <code>/register</code> - Register a face in the database where the request body must be in JSON format following the schema:<pre class=" language-json"><code class="prism  language-json"><span class="token punctuation">{</span>
+	<span class="token string">"photoFilename"</span><span class="token punctuation">:</span> <span class="token string">"Zac Brannelly"</span><span class="token punctuation">,</span> <span class="token comment">// Name of the new user</span>
+	<span class="token string">"faceEncodings"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token number">0.2</span> <span class="token operator">...</span> <span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token comment">// Unique vector for this face</span>
+	<span class="token string">"isVisitor"</span><span class="token punctuation">:</span> <span class="token boolean">true</span> <span class="token comment">// Whether the face should be registered as a visitor </span>
+<span class="token punctuation">}</span>
+</code></pre>
+This will then return a JSON document containing the unique identifier of the newly registered user:<pre class=" language-json"><code class="prism  language-json"><span class="token punctuation">{</span> <span class="token string">"userID"</span><span class="token punctuation">:</span> <span class="token string">"ADJSKDJSKD.."</span> <span class="token punctuation">}</span>
+</code></pre>
+</li>
+<li>POST <code>/registerImage</code> - Register a face in the database using an image posted as <code>file</code> and the fields <code>name</code> and <code>isVisitor</code>.</li>
+<li>GET <code>/deleteUser?userID=ALSKASLKALS..</code> - Deletes the face from the datbase via their unique ID.</li>
+<li>GET <code>/listFaces</code> - Returns a list of the faces registered in the database in JSON format.</li>
+</ul>
+<p>So the Unity App uses the <code>/</code> web end-point to upload the snapshot of the user. If the JSON document in the response has <code>"authenticated": true</code> then it set the name of the face the snapshot came from to the name in the response. Otherwise it will increment a counter, if this counter is over a certain threshold then the face will be considered a new visitor.</p>
+<h3 id="virtual-receptionist-slack-bot">Virtual Receptionist Slack Bot</h3>
+<p>So I needed a nice and easy way to import staff faces into the receptionist’s database, given that everyone in the office is on Slack, and we already need a Slack Bot for the receptionist to send messages, I thought why not manage the face database from the Slack bot using natural language (via Dialogflow). So in the Node.js Docker container that handles the sending of messages, I start listening for direct messages to the bot and when received I send them to a new Dialogflow bot.</p>
+<h4 id="import-staff-faces">Import Staff Faces</h4>
+<p>First I created an intent in the Dialogflow bot called <code>RegisterFace</code> which will match with phrases close to “I would like to register a face”. The Slack bot Docker container detects when this intent has been matched and will send the next image (or zip file containing a range of images) to the Face Encoder Docker container for registration. It will extract the name of the user from the filename of the image uploaded. The biggest face in the image is used for registration. All images uploaded via this method are considered staff. The Slack bot Docker container uses the <code>/registerImage</code> web end-point on the Face Encoder Docker container to register the images into the databse.</p>
+<p><img src="https://lh3.googleusercontent.com/7ODip2ze7T7l4lWCLeNK0wrqUYby8Z4W8IelSx4tKJK4Q8BB8kwWFTwd1-GfIHIBddUIGpxJrkbk=s900" alt="enter image description here"><br>
+<em>Figure 16: Example of dialog for registering a staff member</em></p>
+<h4 id="list-faces">List Faces</h4>
+<p>Then I created another intent called <code>ListFaces</code> which will match to phrases such as “list all the faces registered<br>
+please”. When the Docker container detects this intent, it will generate a list of faces and append it to the response from the Dialogflow bot. This list will include the name of the face as well as their unique ID which can be used to delete them (in the event of name clashes).</p>
+<p><img src="https://lh3.googleusercontent.com/zXm7dQLy1Sqswn094Q4GbmZcw8YzX55EU1dtdipQzfHvgpk6JUB58Hn6xgl8hOoiD9cJTY70zRTb" alt="enter image description here"><br>
+<em>Figure 17: Example of dialog for listing faces in the database</em></p>
+<h4 id="remove-faces">Remove Faces</h4>
+<p>Lastly I made an intent named <code>RemoveFace</code> which is triggered by phrases similar to “I would like to delete a face”. I then made another intent that is directly matched after this one which captures the name (or unique ID) of the face the user wants to delete. This intent (which is called <code>RemoveFace - name</code>) is then detected by the Docker container and the <code>/deleteUser</code>  end-point of the Face Encoder Docker container is used to remove the face from the database.</p>
+<p><img src="https://lh3.googleusercontent.com/zD2TxyWf8yKEY1Gd8rl48_rUj7EGN7UYk9pdapHsAoalfJPg7mBv7oj9HdHSfOUxjCWSgn-K3ZMY" alt="enter image description here"><br>
+<em>Figure 18: Example of dialog for removing a face from the database</em></p>
+<h3 id="chat-bot-service-chatscript-with-a-hint-of-dialogflow">Chat Bot Service (ChatScript with a hint of Dialogflow)</h3>
+<p>For the final implementation I chose to use ChatScript instead of Dialogflow for the receptionist’s “brain”. The main motivating factors for using this over Dialogflow was being able to send data to and from the system using out-of-band data, and the ability to save variables across different <em>intents</em> easily. The combination of the two was a perfect match for working with a State Machine on the front-end side. Where we can get/set the current state of the front-end app from the ChatScript using OOB and remember what the current state is in ChatScript using variables.</p>
+<p>So the front-end application would send a message like <code>[state RemoveUser]</code> to ChatScript and the code below would match with it and save the state to a variable:</p>
+<pre><code>u:  UNION_SET_STATE ( &lt;  \[ *  state  _*1 *  \] ) ^keep() ^repeat()
+	$currentState  = _0
+</code></pre>
+<p>Since the above specifies no response, ChatScript will look for another <em>intent</em> that matches with the  current input as well as the current state of the variables. ChatScript will eventualy match with the code below which is only matched when the <code>$currentState</code> variable is set to <code>RemoveUser</code> and the <code>$userType</code> variable is set to visitor. ChatScript will then send back one of the responses in the <code>[]</code> brackets.</p>
+<pre><code>t:  GAMBIT_STATE_REMOVE_USER ($currentState==RemoveUser $userType==visitor) ^keep() ^repeat()
+	[Are you sure you want to remove all your information?]
+	[Are you sure? This cannot be undone]
+	[This will erase all your data, are you sure?]
+	[Are you sure? I won't know you after!]
+	[This will remove your face from my memory, are you sure?]
+	[This cannot be undone, are you sure?]
+	[Are you sure you want me to forget about you?]
+
+	# Out of band data commanding front-end to show the are you sure dialog on the screen
+	\[ \{ \" command \" : \" ShowRemoveAreYouSure \" , \" startRecording \" : true  \} \]
+
+	a: (!(&lt; \[ ) &lt;&lt; ~yes &gt;&gt; )
+		[Alright removing your data now!]
+		[Alright, erasing my memory of you from my brain now.]
+		[Erasing your information now.]
+		[Deleting your data from my database now.]
+		[Okay, removing your information from my memory now.]
+		[Okay, erasing my memory of you from my brain now.]
+
+		# Out of band data commanding front-end to remove the user data
+		\[ \{ \" command \" : \" RemoveUserData \" \} \]
+
+	a: (!(&lt; \[ ) &lt;&lt; ~no &gt;&gt; )
+		[Canceling your request now!]
+		[Oh good, I can keep knowing you.]
+		[Stopping your request now!]
+		[Alright I'll keep your data.]
+		[Don't worry, I'll keep your data safe with me.]
+		[Alright, stopping your request now.]
+
+		# Out of band data commanding front-end to cancel the request
+		\[ \{ \" command \" : \" DontRemoveUserData \" \} \]
+</code></pre>
+<p>This code is an example of how we greet new users that  have just registered or have returned. It shows how easy it is to gather information from the user’s input and use said input in the response of the receptionist.</p>
+<pre><code>s:  STATEMENT_GREET_VISITOR ( &lt;  \[  visitor  has  approached  with  name  _*  \] ) ^keep() ^repeat()
+	$userName = _0
+	$userType = visitor
+
+	[Hello $userName]
+	[G'day $userName]
+	[Hi $userName]
+	[Ahoy $userName]
+	[Howdy $userName]
+	[Hey there $userName]
+	[Hello there $userName]
+	[Top of the morning to ya $userName]
+	[Why hello there $userName]
+	[ \" $userName ! \" It's good to see you.]
+	[ \" $userName ! \" It's wonderful to see you.]
+</code></pre>
+<p>Achieving the same result above is much more difficult in Dialogflow. The only advantage that Dialogflow has over ChatScript is their ability to match intents with phrases as it uses more advanced NLP techniques. One option would be to use Dialogflow solely for  the purpose of intent matching and then use ChatScript for the rest. I however didn’t choose to implement this as it would add a noticeable delay to all responses.</p>
+<p>I did end up using Dialogflow as a fallback “brain” that would only be used if absolutely nothing was matched in ChatScript. This, for example, made putting in small talk much more easier since Dialogflow has built-in small talk functionality. So you can  go up to the receptionist and ask her how her day is going (in any kind of variation) and she will respond appropriately.</p>
+<h3 id="state-machine">State Machine</h3>
+<p><img src="https://lh3.googleusercontent.com/k9WgYWx3XI96I6Ia6Mr5QcgS1PdRI4GmR1eXWkg5CiP5m0fkGxG7VUvbBf6fw5S1mewRZWLAwyIm" alt="enter image description here"><br>
+<em>Figure 19: Planned architecture of the State Machine</em></p>
+<p>So for the implementation of the State Machine, I used the composite design pattern where the State Machine contains many states and is  a state itself. I did this because originally the Entertainment state was going to be a sub-state machine but in the end their were only two entertainment related states so this did not happen. As you can see each workflow has their own state and their transitions are the same as the diagram in Figure 15.</p>
+<p>Each state has virtual functions which can be overridden to implement the state properly. These are as follows:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">State</span>
+<span class="token punctuation">{</span>
+	<span class="token comment">// Called when the state has been entered</span>
+	<span class="token keyword">public</span> <span class="token keyword">virtual</span> <span class="token keyword">void</span> <span class="token function">Enter</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+	
+	<span class="token comment">// Called each frame when the state is current</span>
+	<span class="token keyword">public</span> <span class="token keyword">virtual</span> <span class="token keyword">void</span> <span class="token function">Update</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+	
+	<span class="token comment">// Called when the state is being changed</span>
+	<span class="token keyword">public</span> <span class="token keyword">virtual</span> <span class="token keyword">void</span> <span class="token function">Leave</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+	
+	<span class="token comment">// Called when the user has said something to the receptionist</span>
+	<span class="token comment">// Returns what is actually sent to the "brain" (allows for overriding input)</span>
+	<span class="token keyword">public</span> <span class="token keyword">virtual</span> <span class="token keyword">string</span> <span class="token function">ProcessInput</span><span class="token punctuation">(</span><span class="token keyword">string</span> userInput<span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> userInput<span class="token punctuation">;</span>
+	
+	<span class="token comment">// Called when the "brain" has come up with a response to the input</span>
+	<span class="token comment">// Returns what is actually sent to the Text-To-Speech service</span>
+	<span class="token comment">// This is where we can check for OOB data and perform actions</span>
+	<span class="token comment">// We can also modify what the receptionist says if neccessary</span>
+	<span class="token keyword">public</span> <span class="token keyword">virtual</span> ChatServiceResponse <span class="token function">ProcessResponse</span><span class="token punctuation">(</span>ChatServiceResponse response<span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> response<span class="token punctuation">;</span>
+
+	<span class="token comment">// Called when the response given has finished playing to the user</span>
+	<span class="token comment">// We can also check for OOB data here if we want the action to happen after</span>
+	<span class="token comment">// the response is played</span>
+	<span class="token keyword">public</span> <span class="token keyword">virtual</span> <span class="token keyword">void</span> <span class="token function">ResponsePlayedToUser</span><span class="token punctuation">(</span>ChatServiceResponse response<span class="token punctuation">)</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>Using the functions above, and ChatScript I was able to implement most of the workflows discussed during planning with relative ease.</p>
+<h4 id="registration">Registration</h4>
+<p><img src="https://lh3.googleusercontent.com/ixuNrgex8TeGxQ1YuqMOZYonGFzCedTAaVmpCQrBgMLsCFUtIn1JrXi43stRt8FwftmiWcBgnUBG" alt="enter image description here"><br>
+<em>Figure 20: GIF of registration workflow</em></p>
+<p>The above GIF (Figure 20) is a complete screen capture of the final registration workflow. Where the receptionist will ask what your name is, and it will show a UI dialog where you can either enter your name via on-screen keyboard or you can say it (not shown in this GIF). When saying your name via voice, it utilizes Dialogflow’s powerful NLP techniques to extract your name from the phrase, so even if you say “My name is Zac” it will only extract “Zac”. Next it expands the size of the webcam feed and starts a countdown to take a snap of you. This snap is then sent for encoding to the Face Encoder Docker and then if the encodings are received then they are registered in a MongoDB database. The receptionist will then move on to the Look Up workflow.</p>
+<h4 id="look-up">Look Up</h4>
+<p><img src="https://lh3.googleusercontent.com/TAdVqJwcOVCBLmRKbTcFVJ08hEXvobT9ut5SvqgQkZdZQz6PQKEWEE7AWs5QsV3-30oRvmKDebK7" alt="enter image description here"><br>
+<em>Figure 21: GIF of look up workflow</em></p>
+<p><img src="https://lh3.googleusercontent.com/NmliQbYMsJeqYBk16mM0FaytimJhZ2XDVK4H5BFSVcuYo26Jc5kuhJi9Mmlz4VyhfZET5EaovmUG" alt="enter image description here"><br>
+<em>Figure 22: Example of message sent during look up workflow to staff member</em></p>
+<p>The above GIF (Figure 21) shows a screen capture of the entire Look Up workflow. Where the receptionist will first ask you who you are here to see while showing a dialog with a complete list of the staff in the office. In this dialog, you can scroll and select, you can search via text and select, or you can use your voice to search (and auto-select if only one result). Then it will ask you for the purpose of your visit, where we narrowed it down to a few options for ease of use. Here you can too use voice to select an option, if the voiced option wasn’t recognized then “Other” is automatically selected. It will then send a Slack message to the staff member selected eariler. An example of the message sent can be seen in Figure 22. It will then go to an idle state where it waits for input from the user.</p>
+<h4 id="contact-staff">Contact Staff</h4>
+<p><img src="https://lh3.googleusercontent.com/f3Hki3Fm6aOKUC5chfMoBBS2IO8UUIDVa0W_EWfHU1f_C941EhOAhzRM2INyfrbvRaVzefYhHWmT" alt="enter image description here"><br>
+<em>Figure 23: GIF of contact staff workflow</em></p>
+<p><img src="https://lh3.googleusercontent.com/cFxxcwsZLhp7JkfbCKW48hduyV-9oizsKnWOHNaIZjlPkXzQA7Cwf6uSM9hmZx9zSaDtpSb01QBF" alt="enter image description here"><br>
+<em>Figure 24: Example of message sent to staff during contact staff workflow</em></p>
+<p>The above GIF (Figure 23) is a complete screen capture of the Contact Staff workflow. Where the user must ask the receptionist if they can message someone. Then she will ask what would you like to say, where a dialog will be shown. You can either say or enter the message via the on-screen keyboard. Then she will ask who you would like to send the message to and will show a dialog similar to the one shown in the Look Up workflow (has all the same features). Then it will send the message via Slack to the staff member and will notify if it was successful or not. An example of a message can be seen in Figure 24 (this is not the same message sent in Figure 23). It will then go back to an idle state where it waits for instructions from the user.</p>
+<h4 id="remove-user-information">Remove User Information</h4>
+<p><img src="https://lh3.googleusercontent.com/WFSOsPuG1vNuLjAX159PKS1OknukVmLYIVwhhZnk8xu92aOW5nMof1f3LZiRRsh3pACyMuN3CukJ" alt="enter image description here"><br>
+<em>Figure 25: GIF of remove user information workflow</em></p>
+<p>The GIF above (Figure 25) shows the entire workflow for removing the user’s data. The user must first ask “Please delete my data” and then the receptionist will show a dialog with a “Delete” button and a “Keep” button. You can either press the buttons or respond with “Yes” or “No” via voice input. When the user chooses to delete their data, it will remove their face from the MongoDB database and go back to the idle state. It does not immediately stop recognizing them, instead when they comeback next time, they won’t be recognized.</p>
+<h4 id="ask-a-question-entertainment">Ask a question (Entertainment)</h4>
+<p><img src="https://lh3.googleusercontent.com/w0lULDASKMa9q8m4WjQJ29tV_j5iFcKoCnQpFAMUfazCna5AsviMSBv5_GfNIUdHog9CBiZ8Wcwr" alt="enter image description here"><br>
+<em>Figure 26: GIF of user asking “Who is Margot Robbie” in ask question workflow</em></p>
+<p>The GIF above shows the complete workflow for asking the receptionist a general question. Where the user must first say “Can I ask you a question?” and then the receptionist will say “Sure go ahead”. Then the user must say their question (which in this case was “Who is Margot Robbie?”). The receptionist will then use DuckDuckGo (since we have no DrQA server available) to answer the question. As you can see, it also came along with a picture in the response so this was displayed to the user.</p>
+<h4 id="music-recognition-entertainment">Music Recognition (Entertainment)</h4>
+<p><img src="https://lh3.googleusercontent.com/xPnWrZuX8zNfFFFF0qkAVHm95uoZvCAtDJgKKcTNmhKVxlAiqdx0mYgnoxHAWpnOyDvta5oMu8Zk" alt="enter image description here"><br>
+<em>Figure 27: GIF of the music recognition workflow where is successfully guessed the song</em></p>
+<p>The GIF above shows the complete workflow of the guess the song function. First you ask the receptionist “can you guess this song?” and she will respond with “I definitely can” and then will begin recording straight after. The user must have their song ready to play before asking her to do this. She will record for around 10 seconds and then will send the audio to ACRCloud for recognition. If she gets a response she will say the name and artist (which in this case was Johnny Ran Away by Tones and I) other wise she will ask if you would like her to try again.</p>
 <h2 id="conclusion">Conclusion</h2>
+<p>I really enjoyed working on this project. It had many ups and downs, but overall I learned a lot more from this project than originally thought. I got hands on experience with so many different technologies (some that I didn’t even know existed). This experience will stay with me as I move on to other projects, especially the experience with Google Cloud, Node.js, Tensorflow and Docker. Of course there are many things that, with hindsight, I should’ve done differently. For example I believe I should’ve continued using Dialogflow for the main “brain” since after more research and experimentation I could’ve reproduced the benefits of ChatScript using Dialogflow and made the receptionist much more human-like with its responses. It is also disappointing that we couldn’t give the receptionist the ability to open the door of the office but given the facial recognition could be fooled using a photograph of a staff member this was probably a smart move.</p>
 </div>
 </body>
 
