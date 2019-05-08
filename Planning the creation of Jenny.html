@@ -1,0 +1,77 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planning the creation of Jenny</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h1 id="planning-the-creation-of-jenny">Planning the creation of Jenny</h1>
+<h2 id="introduction">Introduction</h2>
+<p>Welcome again to my mini-series on creating Jenny the Virtual Receptionist. If this is your first time reading one of my posts, my name is Zac Brannelly, I am an IBL student completing my placement at the Applied Artificial Intelligence Institute at Deakin University. In this blog post I will be getting into the process of planning and designing the final product before the actual implementation. Then I will compare the planned product with the actual final product.</p>
+<h2 id="the-process">The Process</h2>
+<p><img src="https://lh3.googleusercontent.com/liNq30b7SSbuRXxa_-llBQpmnX_VoaAHBtaRB88na07bk170y_TOvdW7d_ZGisEGPArUmFdd0RlT=s750" alt="enter image description here"><br>
+<em>Figure 1: Basic flowchart of the process used typically</em></p>
+<p>As explained to me by my supervisor, the way projects are typically handled in this institute is like so:</p>
+<ol>
+<li><strong>Proposal</strong> - Where the type of system needed by the client is described and needs approval.</li>
+<li><strong>Technical Specification / Experimentation</strong> - Where the system is designed including spikes &amp; prototypes to figure out the best approach for the system’s implementation.</li>
+<li><strong>Implementation</strong> - Where the system is actually implemented according to the Technical Specification (this includes planning tasks and performing task estimation).</li>
+<li><strong>Hand-off to clients</strong> - The system is given to the client with all source and documentation needed.</li>
+</ol>
+<p>So to introduce me to this methodology, my supervisor advised that I skip the proposal stage (since we already know what type of system we want) and head straight to writing up a Technical Specification. But before I could write this document I needed to experiment with a bunch of technologies so I knew how to approach a system like this. This involved creating small prototypes (extending from the initial prototype created before I arrived). In these prototypes I used technologies such as speech-to-text, text-to-speech, Dialogflow, DrQA, and Slack API which will be covered in-detail in further blog posts.</p>
+<h2 id="requirements--workflows">Requirements / Workflows</h2>
+<p>So after a busy couple months experimenting with different technologies needed for this project, it was time to start planning the actual implementation of the receptionist. After a meeting with my supervisor, we were able to narrow the scope of this project down to six workflows:</p>
+<ul>
+<li><strong>Registration</strong> - Where the user’s face is sent for recognition, on failure consider the user a visitor and register their face along with their name in a database. Otherwise greet them with their recognized name.</li>
+<li><strong>Look Up</strong> - If the user is a visitor and is registered, ask them who they are here to see, why they are here and notify that staff member of this information via Slack.</li>
+<li><strong>Contact Staff</strong> - If the user requests to send a message, ask them for the message, who to send it to and send the message via Slack.</li>
+<li><strong>Open Door</strong> - Open the door for the user if recognized as  Staff.</li>
+<li><strong>Import Staff</strong> - Provide a means for the office to import staff faces into the system.</li>
+<li><strong>Remove User Information</strong> - Allow visitor users to ask for their face to be deleted from the database.</li>
+<li><strong>Entertainment</strong> - Allow the user to ask general questions and answer them via DrQA. Maybe also guess songs via ACRCloud if time allows.</li>
+</ul>
+<p>Using these workflows, I started compiling a Technical Specification, which outlined how the final system will be implemented. I went though each user workflow and explained step for step how the user and system will interact, leaving no room for vagueness, which makes implementation much more smooth and efficient. Each workflow had a description, list of primary users (who would use the workflow), pre-conditions (what was needed to enter this workflow), and steps (the actual workflow).</p>
+<h2 id="system-architecture--state-machine">System Architecture / State Machine</h2>
+<p>In the Technical Specification I also decided on the type of architecture I would use for this project. I decided on using a Finite State Machine where each workflow is a separate state. This would allow me to separate the logic of each workflow into their own respective classes, making modification and maintainability much more easier. As well as making extension of the functionality much more easier (need to add another workflow? Just create another state). Below is the diagram describing how the state machine will be setup and when the state’s will interchange between each other.</p>
+<p><img src="https://lh3.googleusercontent.com/IDbBKU9C4ZaIKAyf2SDfVo6ONVqfryrQP4iR_bk62qbA-GyrdiUobIZTD4xgbE_pknO3Q33ICnc1=s900" alt="enter image description here"><br>
+<em>Figure 2: Overall Finite State Machine with transition rules shown</em></p>
+<p><img src="https://lh3.googleusercontent.com/RU1nB3fPON9vsE0Ht0TTAL-Z4TRikMsepiap6HSauysUWyEXPPc51K4RMjgITuUMQz1LIoQizqHc" alt="enter image description here"><br>
+<em>Figure 3: Entertainment sub-state machine</em></p>
+<p>Once I had designed how the state machine would function at run-time, I needed to design how this would actually be implemented into the system. Thankfully I had recently completed a unit called AI for Games which covered the implementation of state machines extensively. How they liked to implement a state machine is by using the composite pattern where a <code>StateMachine</code> has many <code>State</code>'s and the <code>StateMachine</code> itself is considered a <code>State</code> allowing for sub-state machines. Which as you can see (in Figure 4) I had planned to use for the <code>EntertainmentState</code>.</p>
+<p><img src="https://lh3.googleusercontent.com/k9WgYWx3XI96I6Ia6Mr5QcgS1PdRI4GmR1eXWkg5CiP5m0fkGxG7VUvbBf6fw5S1mewRZWLAwyIm" alt="enter image description here"><br>
+<em>Figure 4: State machine UML class diagram</em></p>
+<p>Next I needed a design for the how Jenny’s communication ability would be implemented. As you can see in Figure 5, I generalized the functionality of the brain into an interface, making the swapping in and out of her “brain” require little to no code changes. The <code>ChatService</code> module holds which “brain” is in use and handles the voice coming in (see figure 6), generating the text response, and generating her voice.</p>
+<p><img src="https://lh3.googleusercontent.com/EdNCBLN6dWR9CQS-SDuocyKO5kQw8hpFyqr4ZlRH2rv25SMFLpEDGsaJ7MgmJj2-mVB5dkyzOJQF" alt="enter image description here"><br>
+<em>Figure 5: UML class diagram for Jenny’s ability to talk</em></p>
+<p><img src="https://lh3.googleusercontent.com/qPhZ3UmgD_Rw1yT_pzfCfjDqTgIhI4KU97EFxVGkiBwezW1yzcMeWnaiYtGbg0WJSlCEhSdchA_d=s300" alt="enter image description here"><br>
+<em>Figure 6: UML class diagram for Jenny’s ability to listen</em></p>
+<h2 id="user-interface">User Interface</h2>
+<p>While compiling the Technical Specification, I started creating some wire frame designs of how the UI should look (or close to what it should look like). Here are some designs that were included in the specification:<br>
+<img src="https://lh3.googleusercontent.com/HdrwEOyQ_qaNgZLnVJH0SpbYx76cK3MrNY5X5aOyA0dv87ysOPiMrw2eUY-IKeYs3StZo7bQgXew=s750" alt=""><br>
+<em>Figure 7: Registration state where the user must enter their name</em></p>
+<p><img src="https://lh3.googleusercontent.com/e3YqaWjJ3ryACBw3SQTDOXM37SkeSavNoJZtFE0aFBpbS4A4giKg_KMpySh9BGj8NKWuu2nAu-NF=s700" alt="enter image description here"><br>
+<em>Figure 8: Contact Staff state where the user must pick the staff to contact</em><br>
+<img src="https://lh3.googleusercontent.com/z8BykJElzl1wPlR-tWi2Du7mWv0UA5QaZ8DXTnmH4OYQ9eGFtWCVcLn0J3ce5Hvd6oiJ8l16Du11=s700" alt="enter image description here"><br>
+<em>Figure 9: Waiting for input state where the user is speaking to the receptionist</em></p>
+<p><img src="https://lh3.googleusercontent.com/hmrlYjbMIRDgloGhjogTxupL-yV9ieUxdY7ALgG0iWjqyEpFf96UnRNYLYSMIsZkhxqbK4D5C08f=s700" alt="enter image description here"><br>
+<em>Figure 10: Design of webcam display on the kiosk screen</em></p>
+<h2 id="comparison-to-final-product">Comparison to final product</h2>
+<p>After the Technical Specification was complete, implementation was allowed to begin (the fun part), and thanks to the detail of the specification this was a painless process. Although majority of what was planned made it into the final implementation, there were a few details that were changed or removed from the product. First of all, the entire workflow of opening the door for staff members was omitted from implementation, this was due to security concerns as this would work based off facial recognition which could be fooled easily. Otherwise all other workflows remained intact. Architecture wise, most of it was implemented as planned, except for in the state machine implementation, the idea to make the Entertainment state a state machine itself was scrapped as there was only two states implemented that were considered entertainment, no real need for it’s own state machine.</p>
+<p>In terms of UI, the final product turned out very similar to the wire-frames but most things had been rearranged a bit. For example the speech recognition UI has been moved to the bottom right instead of the bottom left. The help button has been moved from the middle-right to the bottom left of the screen and an on-screen keyboard has been added. As you can see in Figure 9 I planned to show previous user input, but during implementation I swapped this to show previous output from Jenny. Since there was no real functional need for the user to see what they previously sent but there was a need for seeing what the receptionist said, just in case she wasn’t heard properly. Just comparing Figure 9 and Figure 11 you can see the differences yourself. Surprisingly the planned UI for the registration and contact staff workflows remained almost identical in the final product as you can see in figure 12 and 13. The final webcam feed display turned out the exact same as the planned too.</p>
+<p><img src="https://lh3.googleusercontent.com/LIXGkym0ePNh80iuyd2NWnKbTu3-98U39ee5ggNyp07fGj8_YoWW0o107Cl1Prgl3jgpYm-9bRF-" alt="enter image description here"><br>
+<em>Figure 11: Screenshot of final product</em></p>
+<p><img src="https://lh3.googleusercontent.com/ixuNrgex8TeGxQ1YuqMOZYonGFzCedTAaVmpCQrBgMLsCFUtIn1JrXi43stRt8FwftmiWcBgnUBG" alt="enter image description here"><br>
+<em>Figure 12: The final registration workflow</em></p>
+<p><img src="https://lh3.googleusercontent.com/R05dB-jsmxTTTFnjDESzvqe_m4CTRFwO_oNfG02l9kNbquXVzxOEPpcFCarRaVZJi2_iRDLEyEyN" alt="enter image description here"><br>
+<em>Figure 13: The final contact staff workflow</em></p>
+<h2 id="next-time-on-keeping-up-with-jenny...">Next time on Keeping Up With Jenny…</h2>
+<p>In my next blog post, I will be running through the implementation of Jenny’s brain, starting with the use of Dialogflow and then moving on to ChatScript.</p>
+<p>Thanks for reading :)</p>
+</div>
+</body>
+
+</html>
