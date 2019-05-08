@@ -1,0 +1,173 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Building Jenny&#x27;s ability to talk</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h1 id="building-jennys-ability-to-talk">Building Jenny’s ability to talk</h1>
+<h2 id="introduction">Introduction</h2>
+<p>Hello again, if this is  your first time reading one of my posts my name is Zac Brannelly and I am an Industry-based learning (IBL) student completing my placement at the Applied Artificial Intelligence Institute (A2I2) at Deakin University. I’ve been working on Jenny the Virtual Receptionist for the majority of my placement.</p>
+<p>In this blog post, I will be going further into the implementation of two very important features needed by Jenny the receptionist. These features being speech-to-text and text-to-speech. Without these features, conversations with her would be limited to text, which would make her almost unusable. Thankfully implementation of these features is quite trivial than expected since Google Cloud Platform provides an API for both of these tasks. Whats even better is they perform at state-of-the-art levels, especially the text-to-speech API which can use <a href="https://deepmind.com/blog/wavenet-generative-model-raw-audio/">Wavenet</a> (by DeepMind) to generate life-like responses.</p>
+<h2 id="speech-to-text">Speech-to-text</h2>
+<p><img src="https://lh3.googleusercontent.com/H-621uOpAoBlPt7X5ZFc9efRQjHQpLPF8ciUuDvb0LYKbYsJvbg0nUZBJ89JJneigs1C3lSfS0hM" alt="enter image description here"><br>
+<em>Figure 1: Example of speech-to-text functionality in the final product</em></p>
+<p>Since the Kiosk has no keyboard, only a touchscreen, text input is more difficult. Hence the use of speech-to-text. Luckily the same technology used by Google’s Virtual Assistant for speech recognition is available for use as a Google Cloud API service. Also since it is a Google Cloud product, the client libraries for this service follow the same architecture, so authentication can follow the same process as described in the blog post about Dialogflow (which can be found <strong>here</strong>)</p>
+<p>The initial challenge was recording audio from the Kiosk’s microphone in Unity and sending it in the correct format. Unity does provide a way of recording audio in the <code>Microphone</code> class but it encodes the data into an <code>AudioClip</code> which represents the signal as an array of floats with a range of <span class="katex--inline"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>[</mo><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mn>1</mn><mo>]</mo></mrow><annotation encoding="application/x-tex">[-1, 1]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mopen">[</span><span class="mord">−</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right: 0.166667em;"></span><span class="mord">1</span><span class="mclose">]</span></span></span></span></span>. Which is then only accessible after recording has finished. This is not ideal since the speech-to-text service needs the audio information encoded in PCM format (16-bit Integers) and we want to be able to stream the data so we can get interim results that can be displayed on th screen. Now that Unity supports a normal version of the .NET framework, I was able to import an audio library called <code>NAudio</code> which is commonly used with this service meaning a lot more support. Using this library also means we can stream audio data since when recording the library periodically calls a callback function with the new audio data encoded in PCM format.</p>
+<p>So with access to the client library as well as NAudio in the Unity project, I began implementing a demo that could perform speech recognition.</p>
+<p>Using this client library is a bit more involved than the Dialogflow one, it starts off similar where you have to create a client using a channel that is created from loading a credentials JSON file. Then to start an actual speech recognition request, we call the <code>StreamingRecognize</code> function. There are other ways of going about a request, there is also <code>Recognize</code> and <code>RecognizeAsync</code> that will attempt to recognize a <em>complete</em> sample of audio. But for this project I want to be able to continuously send audio and receive multiple results (since it looks cooler haha). So after getting a stream returned from the <code>StreamingRecognize</code> method we need to tell the service what format we will be sending data in as well as other settings we would like. Two important settings I would like to note are <code>InterimResults</code> and <code>SingleUtterance</code>. <code>InterimResults</code> when true allows us to receive results that aren’t considered correct but my be part of the final result. <code>SingleUtterance</code>, when true, tells the service that we only one result marked as “final” whereas when false it can return multiple “final” results which is not ideal. Another thing to note is <code>EnableAutomaticPunctuation</code> is a really good feature that is still in BETA so you need to use the BETA version of the client libraries to gain access to it.</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token comment">// Get channel same way we get channel for Dialogflow </span>
+<span class="token comment">// ....</span>
+_client <span class="token operator">=</span> SpeechClient<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span>channel<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// Create recognition stream </span>
+_recogStream <span class="token operator">=</span> _client<span class="token punctuation">.</span><span class="token function">StreamingRecognize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// Send initial audio configuration </span>
+<span class="token keyword">await</span> _recogStream<span class="token punctuation">.</span><span class="token function">WriteAsync</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">StreamingRecognizeRequest</span>
+<span class="token punctuation">{</span>
+    StreamingConfig <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">StreamingRecognitionConfig</span>
+    <span class="token punctuation">{</span>
+        Config <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">RecognitionConfig</span>
+        <span class="token punctuation">{</span>
+            EnableWordTimeOffsets <span class="token operator">=</span> <span class="token keyword">false</span><span class="token punctuation">,</span>
+            Encoding <span class="token operator">=</span> RecognitionConfig<span class="token punctuation">.</span>Types<span class="token punctuation">.</span>AudioEncoding<span class="token punctuation">.</span>Linear16<span class="token punctuation">,</span>
+            LanguageCode <span class="token operator">=</span> <span class="token string">"en-AU"</span><span class="token punctuation">,</span>
+            SampleRateHertz <span class="token operator">=</span> <span class="token number">16000</span><span class="token punctuation">,</span>
+            EnableAutomaticPunctuation <span class="token operator">=</span> <span class="token keyword">true</span>
+        <span class="token punctuation">}</span><span class="token punctuation">,</span>
+        InterimResults <span class="token operator">=</span> <span class="token keyword">true</span><span class="token punctuation">,</span>
+        SingleUtterance <span class="token operator">=</span> <span class="token keyword">true</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>This function below is the callback function that gets executed by NAudio when new audio data is available for processing. In here we just need to send another <code>StreamingRecognizeRequest</code> to the stream, but this time we just set the <code>AudioContent</code> property with the encoded PCM data.</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token comment">// Callback function called by NAudio when new audio data is available</span>
+<span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">OnRecordingDataRecv</span><span class="token punctuation">(</span><span class="token keyword">object</span> sender<span class="token punctuation">,</span> NAudio<span class="token punctuation">.</span>Wave<span class="token punctuation">.</span>WaveInEventArgs args<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+	<span class="token comment">// Send new audio data to speech-to-text</span>
+	_recogStream<span class="token punctuation">.</span><span class="token function">WriteAsync</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">StreamingRecognizeRequest</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+	    AudioContent <span class="token operator">=</span> Google<span class="token punctuation">.</span>Protobuf<span class="token punctuation">.</span>ByteString<span class="token punctuation">.</span><span class="token function">CopyFrom</span><span class="token punctuation">(</span>args<span class="token punctuation">.</span>Buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> args<span class="token punctuation">.</span>BytesRecorded<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">Wait</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>This lambda function below is called in a separate background thread and is responsible for getting the interim results from the recognition stream and put them into a queue. This queue is then taken from in another class where the results are put into the text field seen in Figure 6. The results are only sent to the Dialogflow bot once the <code>IsFinal</code> flag is set.</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token comment">// Continuously check for new results and add them to the result queue</span>
+<span class="token keyword">await</span> System<span class="token punctuation">.</span>Threading<span class="token punctuation">.</span>Tasks<span class="token punctuation">.</span>Task<span class="token punctuation">.</span><span class="token function">Run</span><span class="token punctuation">(</span><span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">&gt;</span> 
+<span class="token punctuation">{</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token keyword">await</span> _recogStream<span class="token punctuation">.</span>ResponseStream<span class="token punctuation">.</span><span class="token function">MoveNext</span><span class="token punctuation">(</span><span class="token keyword">default</span><span class="token punctuation">(</span>System<span class="token punctuation">.</span>Threading<span class="token punctuation">.</span>CancellationToken<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+        <span class="token keyword">var</span> response <span class="token operator">=</span> _recogStream<span class="token punctuation">.</span>ResponseStream<span class="token punctuation">.</span>Current<span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>response<span class="token punctuation">.</span>Results<span class="token punctuation">.</span>Count <span class="token operator">&gt;</span> <span class="token number">0</span><span class="token punctuation">)</span>
+        <span class="token punctuation">{</span>
+            _resultQueue<span class="token punctuation">.</span><span class="token function">Enqueue</span><span class="token punctuation">(</span>response<span class="token punctuation">.</span>Results<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>Alternatives<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>Transcript<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>response<span class="token punctuation">.</span>Results<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>IsFinal<span class="token punctuation">)</span>
+            <span class="token punctuation">{</span>
+                _isFinal <span class="token operator">=</span> <span class="token keyword">true</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<h2 id="text-to-speech">Text-to-speech</h2>
+<p><img src="https://lh3.googleusercontent.com/2VEhkFnMMfgVCLwzPB2vZWyn26xXt7QWn4Bz4dOgZ6QpFwdqmLi0zwjklDvDPGYzdhYWSpx5qm7N" alt="enter image description here"><br>
+<em>Figure 2: Example of what is sent through text-to-speech</em></p>
+<p>Now that she has a “brain” and can understand human speech, we need her to be able to respond in a human voice. The first prototype that was developed before I arrived was capable of text-to-speech but it used Windows Voice to accomplish this. The quality of Windows Voice is not of a high standard and sounds more like a robot than it does human. Thankfully Google provides a text-to-speech cloud API service which uses the latest technology in speech synthesis called Wavenet. Whats even better is you can set the voice to have an accent relative to your location. So we can get her saying “G’day” the correct way haha.</p>
+<p>So since this is another Google Cloud product, the client library follows the same architecture as the other client libraries we have used where the actual conversion takes place with one function call to <code>SynthesizeSpeechAsync</code> as shown below. As you can see the name of the voice is <code>en-AU-Wavenet-C</code>, this tells the service to use a Wavenet voice that has been trained on female Australian voices.</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token comment">// Create channel using same method from Dialogflow</span>
+_client <span class="token operator">=</span> TextToSpeechClient<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span>channel<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">var</span> request <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">SynthesizeSpeechRequest</span>
+<span class="token punctuation">{</span>
+    Input <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">SynthesisInput</span>
+    <span class="token punctuation">{</span>
+        Text <span class="token operator">=</span> text
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    AudioConfig <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">AudioConfig</span>
+    <span class="token punctuation">{</span>
+        AudioEncoding <span class="token operator">=</span> AudioEncoding<span class="token punctuation">.</span>Linear16<span class="token punctuation">,</span>
+        SampleRateHertz <span class="token operator">=</span> <span class="token number">16000</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    Voice <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">VoiceSelectionParams</span>
+    <span class="token punctuation">{</span>
+        LanguageCode <span class="token operator">=</span> <span class="token string">"en-AU"</span><span class="token punctuation">,</span>
+        Name <span class="token operator">=</span> <span class="token string">"en-AU-Wavenet-C"</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">var</span> response <span class="token operator">=</span> <span class="token keyword">await</span> _client<span class="token punctuation">.</span><span class="token function">SynthesizeSpeechAsync</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>The biggest challenge when it comes to implementing this client library into Unity was converting the received audio data into a format that could be used by Unity to play the voice. The service returns the audio data in WAV format (PCM) and since there is no API provided by Unity to load WAV data at runtime we need to do this manually. So I did a lot of research into the WAV format (mainly here: <a href="http://soundfile.sapp.org/doc/WaveFormat/">http://soundfile.sapp.org/doc/WaveFormat/</a>) and after sifting through a lot of Stackoverflow posts I was able to load the audio data into an <code>AudioClip</code> and play it to the user. So for anyone who might be in a similar situation, here is how I accomplished that:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">private</span> AudioClip <span class="token function">ConvertResponseToClip</span><span class="token punctuation">(</span>SynthesizeSpeechResponse response<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token comment">// Get the WAV data from the response</span>
+    <span class="token keyword">var</span> stream <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">MemoryStream</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    response<span class="token punctuation">.</span>AudioContent<span class="token punctuation">.</span><span class="token function">WriteTo</span><span class="token punctuation">(</span>stream<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Read number of channels into a buffer</span>
+    <span class="token keyword">var</span> buffer <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    stream<span class="token punctuation">.</span><span class="token function">Seek</span><span class="token punctuation">(</span><span class="token number">22</span><span class="token punctuation">,</span> SeekOrigin<span class="token punctuation">.</span>Begin<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    stream<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	<span class="token comment">// Convert buffer into integer for number of channels</span>
+    <span class="token keyword">var</span> numChannels <span class="token operator">=</span> BitConverter<span class="token punctuation">.</span><span class="token function">ToInt16</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Read sample rate directly after into the buffer</span>
+    buffer <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    stream<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	<span class="token comment">// Get sample rate from the buffer</span>
+    <span class="token keyword">var</span> sampleRate <span class="token operator">=</span> BitConverter<span class="token punctuation">.</span><span class="token function">ToInt32</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Read the number of bytes in the data section of the wave file</span>
+    stream<span class="token punctuation">.</span><span class="token function">Seek</span><span class="token punctuation">(</span><span class="token number">40</span><span class="token punctuation">,</span> SeekOrigin<span class="token punctuation">.</span>Begin<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    stream<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Calculate number of samples (dataSize = samples * channels * 2)</span>
+    <span class="token comment">// So "number of samples" = dataSize / (channels * 2)  </span>
+    <span class="token keyword">var</span> samples <span class="token operator">=</span> BitConverter<span class="token punctuation">.</span><span class="token function">ToInt32</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token number">2</span> <span class="token operator">*</span> numChannels<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Seek to the start of the data section</span>
+    stream<span class="token punctuation">.</span><span class="token function">Seek</span><span class="token punctuation">(</span><span class="token number">44</span><span class="token punctuation">,</span> SeekOrigin<span class="token punctuation">.</span>Begin<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">var</span> data <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">float</span><span class="token punctuation">[</span>samples<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    buffer <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+	
+	<span class="token comment">// Load the samples into a buffer and convert to a normalized float</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> samples<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span>
+    <span class="token punctuation">{</span>
+        stream<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        data<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> BitConverter<span class="token punctuation">.</span><span class="token function">ToInt16</span><span class="token punctuation">(</span>buffer<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token keyword">float</span><span class="token punctuation">)</span><span class="token keyword">short</span><span class="token punctuation">.</span>MaxValue<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// Create a clip and set the data </span>
+    <span class="token keyword">var</span> clip <span class="token operator">=</span> AudioClip<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span><span class="token string">"response"</span><span class="token punctuation">,</span> samples<span class="token punctuation">,</span> numChannels<span class="token punctuation">,</span> sampleRate<span class="token punctuation">,</span> <span class="token keyword">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    clip<span class="token punctuation">.</span><span class="token function">SetData</span><span class="token punctuation">(</span>data<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">return</span> clip<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>The main con to using this service over Windows Voice is the fact that the Google service operates on the cloud, so there is going to be a bigger delay when converting text into voice (especially when the internet is slow). To overcome this issue, I cache all new responses to disk, so that if they are used again the cached response is played rather than using the service again. This also saves money in the long run since Google Cloud Text-to-speech is a pay-as-you-go service. The only con to this solution is disk usage but for the amount of different responses there will be I doubt it will take up much space.</p>
+<h2 id="takeaways">Takeaways</h2>
+<ul>
+<li>It is a lot more trivial to implement these two features once you increase the version of .NET used by Unity for the scripting run-time and use the client libraries provided by Google.</li>
+<li>Cache responses from text-to-speech to save money and reduce latency between input and response.</li>
+<li>Converting from WAV format into an AudioClip and vice versa can be tricky but not impossible.</li>
+<li>Don’t use Unity’s Microphone class to record audio, use a well maintained library instead such as NAudio (but keep in mind portability).</li>
+<li>Use streaming recognition when doing speech-to-text where possible, reduces lag between input and output.</li>
+<li>Authentication for both services operate in the exact same way as Dialogflow.</li>
+</ul>
+<h2 id="next-time-on-keeping-up-with-jenny..">Next time on Keeping Up With Jenny…</h2>
+<p>In the next blog post I am going to go more in-depth into the approaches taken for open question answering, specifically with DrQA and DuckDuckGo’s Instant Answer API.</p>
+<p>Thanks for reading :)</p>
+</div>
+</body>
+
+</html>

@@ -1,0 +1,108 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Building Jenny&#x27;s Brain - Dialogflow</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h1 id="building-jennys-brain---dialogflow">Building Jenny’s Brain - Dialogflow</h1>
+<h2 id="introduction">Introduction</h2>
+<p>Hello all :) Welcome back to my little mini-series on the implementation of Jenny - The Virtual Receptionist. If this is your first time reading my posts, I am Zac Brannelly, an IBL student, completing my placement at the Applied Artificial Intelligence Institute (A2I2). In this blog post I will be discussing the creation of Jenny’s first brain using Dialogflow.</p>
+<p><img src="https://upload.wikimedia.org/wikipedia/en/thumb/c/c7/Dialogflow_logo.svg/1280px-Dialogflow_logo.svg.png" alt="" height="50"></p>
+<p>Dialogflow is a Google-owned service that specializes in building chat-bots that utilize NLP to understand the users intent, extract useful information and respond accordingly. This service is most commonly used to create bots that can perform certain actions such as booking flights entirely via natural language (text input or even speech). Since it is hosted on Google servers, it is capable of scaling to millions of users easily.</p>
+<h2 id="implementation">Implementation</h2>
+<p>This service seemed to fit the bill in terms of what the receptionist project needed. So I dug deeper into how this service works and whether it could be used in Unity. So first I researched how to create a basic bot that can say hello. Creating a bot is actually quite simple, all it requires is having a Google Cloud account. The actual creation of the bot (including creating its knowledge) is all done in-browser with a simple user-interface.</p>
+<p>Once the bot is created you then need to create an <strong>Intent</strong>. Intent is probably the most important keyword when talking about Dialogflow. An intent is an action or topic that the user is intending to activate. So when the user says something that fits the description of the intent, Dialogflow will activate that intent and return the response detailed in the intent’s settings. When creating an intent, you need to provide a name for the intent as well as a range of phrases that you believe should activate the intent, Dialogflow will use these phrases to train the bot in recognizing the intent. The more training phrases provided, the more likely Dialogflow will correctly match the intent. For example, to create an intent that would match with the user asking for help you could use the following phrases:</p>
+<p><img src="https://lh3.googleusercontent.com/d8iwPMvsqjNms7XHQjpKlY4bHLbUKjw-ivtuTNANOWJstSLJiYXUKWVVbG9Q_m7YxXDwZc9DgkWW=s700" alt="enter image description here"><br>
+<em>Figure 1: Example training phrases for an intent in Dialogflow</em></p>
+<p>Once you have trained the intent, you can provide a range of appropriate responses if this intent is activated. Dialogflow will randomly select one of these responses and return it to the user. Using this knowledge it is already possible to make a basic chat bot that can respond to simple phrases. The next question I was asking myself was “That’s great, but how do I get the bot to recognize information and regurgitate that back to the user?”</p>
+<p>This is where the concept of an <strong>Entity</strong> comes in to play. I think of entities as categories of information. For example a name can be considered an entity. They are defined much like intents where you provide a name for the entity and then a range of possible values for said entity. Then for each possible value you can provide synonyms to further help training the bots perception of that entity. Dialogflow also comes with many built-in entities that can be used straight away, one of these is called <code>@sys.given-name</code> which is used to match the first name of users. You then need to ensure, when training an intent, that the example phrase word that would be matched with an entity is highlighted like so:</p>
+<p><img src="https://lh3.googleusercontent.com/WeKrmtD2RP3iAtPAvIHcFpB3cZMfPmGL4n1tK9KwPpFGliOOp9lbczUomwm7dCXlusqVk-SDrHBc=s500" alt="enter image description here"><br>
+<em>Figure 2: Using entities in intent training</em></p>
+<p>You then can use the <code>$</code> prefix in the responses section to include the entity in the response of the bot. The following example would include the name of the user (given it was provided by them in the input that activated this intent) in the response.</p>
+<p><img src="https://lh3.googleusercontent.com/xSD38_-qipH0DdL6dFH1_RUtB8j0ytLs32Ol3FZhRppOvVXwICQ-mrko_1o07sl2-TXIpR72RPr8=s500" alt=""><br>
+<em>Figure 3: Using the resolved value of the given-name entity in the response of the bot</em></p>
+<p>So now it is possible to make a “parrot” bot which can regurgitate information that it is told. Great. For the purposes of getting a demo together as quick as possible, I chose to stop research on how Dialogflow bots are created and focused more on how they are integrated into applications.</p>
+<p>The initial challenge with implementing a Dialogflow bot into the project was even though Unity uses C# as the scripting language and Dialoglfow has a client library written in C#, the runtime version Unity uses by default is unsupported by the client library. Only recently has Unity allowed the use of higher versions of the .NET runtime which the client libraries need. Since I had been using Unity the previous year when that wasn’t possible (and it was very annoying) I wasn’t immediately aware and decided to try and interact with Dialogflow using it’s RESTful API. After wrestling with that for a couple days, mainly having issues due to getting authentication right, I found out that the C# runtime version could be changed in Unity and imported the client library into the project.</p>
+<p>From here on, the biggest challenge was <em>again</em> getting authentication working since following the tutorials for the client library, they tell you to use the <code>GOOGLE_APPLICATION_CREDENTIALS</code> environment variable to set the path to a JSON file containing the private key for your account. So that when you use the client library your credentials will be automatically loaded from there. This does not work as well as they think it does, for reasons beyond my knowledge I could not get the client library to authenticate from my environment variable. Either way this is not favorable because when being deployed, I don’t want to have to manually set the environment variable (or automatically edit environment variables via script which is just unnecessary). Information on alternative authentication methods was not as easy to find and took a while to get right, so for anyone who needs to use a Google Cloud service, here is how I got authentication working:</p>
+<ol>
+<li>Create a Service Account in the Google Cloud Console.</li>
+<li>Ensure this account has the correct permissions to use Dialogflow.</li>
+<li>Download a JSON file containing the credentials for the Service Account.</li>
+<li>Put this file in the <code>Resources/credentials</code> folder (non-Unity apps just put it somewhere in the project files)</li>
+<li>Then use the following code to initialize the client library:<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">using</span> Grpc<span class="token punctuation">.</span>Core<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Grpc<span class="token punctuation">.</span>Auth<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Google<span class="token punctuation">.</span>Apis<span class="token punctuation">.</span>Auth<span class="token punctuation">.</span>OAuth2<span class="token punctuation">;</span>
+<span class="token keyword">using</span> Google<span class="token punctuation">.</span>Cloud<span class="token punctuation">.</span>Dialogflow<span class="token punctuation">.</span>V2<span class="token punctuation">;</span>
+
+<span class="token comment">// Load credentials JSON file to a string </span>
+<span class="token keyword">var</span> jsonCred <span class="token operator">=</span> Resources<span class="token punctuation">.</span><span class="token generic-method function">Load<span class="token punctuation">&lt;</span>TextAsset<span class="token punctuation">&gt;</span></span><span class="token punctuation">(</span><span class="token string">"credentials/dialogflow"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">if</span> <span class="token punctuation">(</span>jsonCred <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+	<span class="token comment">// Create credentials from file then create a channel</span>
+	<span class="token keyword">var</span> credentials <span class="token operator">=</span> GoogleCredential<span class="token punctuation">.</span><span class="token function">FromJson</span><span class="token punctuation">(</span>jsonCred<span class="token punctuation">.</span>text<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	<span class="token comment">// Create a session with Dialogflow using the channel</span>
+	<span class="token keyword">var</span> channel <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Channel</span><span class="token punctuation">(</span>
+			SessionsClient<span class="token punctuation">.</span>DefaultEndpoint<span class="token punctuation">.</span><span class="token function">ToString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> 
+			credentials<span class="token punctuation">.</span><span class="token function">ToChannelCredentials</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	_client <span class="token operator">=</span> SessionsClient<span class="token punctuation">.</span><span class="token function">Create</span><span class="token punctuation">(</span>channel<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">else</span>
+	Debug<span class="token punctuation">.</span><span class="token function">LogError</span><span class="token punctuation">(</span><span class="token string">"Failed to load credentials for dialog flow!"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+</li>
+</ol>
+<p>Once authentication was successful, sending queries to the Dialogflow bot was a simple function call that looks like so:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">var</span> query <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">QueryInput</span>
+<span class="token punctuation">{</span>
+	Text <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">TextInput</span>
+	<span class="token punctuation">{</span>
+		Text <span class="token operator">=</span> text<span class="token punctuation">,</span>
+		LanguageCode <span class="token operator">=</span> <span class="token string">"en-US"</span>
+	<span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">var</span> response <span class="token operator">=</span> <span class="token keyword">await</span> _client<span class="token punctuation">.</span><span class="token function">DetectIntentAsync</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">SessionName</span><span class="token punctuation">(</span><span class="token string">"agent-name"</span><span class="token punctuation">,</span> <span class="token string">"session-name"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+Debug<span class="token punctuation">.</span><span class="token function">Log</span><span class="token punctuation">(</span><span class="token string">"Got response: "</span> <span class="token operator">+</span> response<span class="token punctuation">.</span>QueryResult<span class="token punctuation">.</span>FulfillmentText<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>Then from the <code>response</code> object we can get lots more information than just the text response such as the name of the intent matched (accessible via <code>response.QueryResult.Intent.DisplayName</code>) and recognized entities (accessible via <code>response.QueryResult.Parameters.Fields["given-name"].StringValue</code>).</p>
+<p>One final question that was still on my mind was “Alright, how about when something happens, like the user leaving, I would want her to say something even though the user sent nothing”. The quick hacky fix for this would just have intents for hello and goodbye and send a message manually that would match with those intents. But this didn’t feel like a good solution, so I did a bit more research and found <strong>Events</strong>. Events are just string values attached to intents which activate the intent when sent via the client library. This is how an event is sent using the library:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">var</span> query <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">QueryInput</span>
+<span class="token punctuation">{</span>
+	Event <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">EventInput</span>
+	<span class="token punctuation">{</span>
+		LanguageCode <span class="token operator">=</span> <span class="token string">"en-US"</span><span class="token punctuation">,</span>
+		Name <span class="token operator">=</span> <span class="token string">"EVENT_NAME_HERE"</span><span class="token punctuation">,</span>
+	<span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">var</span> response <span class="token operator">=</span> <span class="token keyword">await</span> _client<span class="token punctuation">.</span><span class="token function">DetectIntentAsync</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">SessionName</span><span class="token punctuation">(</span><span class="token string">"agent-name"</span><span class="token punctuation">,</span> <span class="token string">"session-name"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+Debug<span class="token punctuation">.</span><span class="token function">Log</span><span class="token punctuation">(</span><span class="token string">"Got response: "</span> <span class="token operator">+</span> response<span class="token punctuation">.</span>QueryResult<span class="token punctuation">.</span>FulfillmentText<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>You could also send information such as the users name in the <code>Parameters</code> of the event like so:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp">query<span class="token punctuation">.</span>Event<span class="token punctuation">.</span>Parameters<span class="token punctuation">.</span>Fields<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span><span class="token string">"given-name"</span><span class="token punctuation">,</span> <span class="token string">"Zac"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>So using all the information I have learnt from research, I chucked together a small demo which could greet the user on arrival and respond to basic phrases such as “Hello” and “How are you?” that could be sent to the bot via text input.<br>
+This demo looked like so:</p>
+<p><img src="https://lh3.googleusercontent.com/IJO6H1ht2k_xLX-gG9czdtum3BGBzsgLpZM-xKo7T10tLbiRkdIm20GmKp2x9fSvtjeUD-f7gHci=s800" alt="enter image description here"><br>
+<em>Figure 4: Screen capture of prototype that used Dialogflow for its “brain”</em></p>
+<h2 id="takeaways">Takeaways</h2>
+<ul>
+<li>When using Dialogflow, or any Google Cloud Platform service, don’t use the default way of authentication (loading the private key file from environment variable), since in my experience it doesn’t work well and is a pain to setup when deploying.</li>
+<li>Understanding the meaning of intents is crucial to use Dialogflow, but once you understand these, it is very trivial to use.</li>
+<li>Unity CAN support the client libraries provided by Google, making integration into Unity applications very easy. This is just not by default.</li>
+</ul>
+<h2 id="up-next-on-keeping-up-with-jenny...">Up next on Keeping Up With Jenny…</h2>
+<p>In the next blog post of this mini-series, I will be explaining the use of ChatScript as a replacement for Dialogflow as Jenny’s brain.</p>
+<p>Thanks for reading :)</p>
+</div>
+</body>
+
+</html>

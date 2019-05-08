@@ -1,0 +1,155 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Building Jenny&#x27;s Brain - ChatScript</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h1 id="building-jennys-brain---chatscript">Building Jenny’s Brain - ChatScript</h1>
+<h2 id="introduction">Introduction</h2>
+<p>Hello all :) Welcome to the fourth installment of my mini-series on developing Jenny - The Virtual Receptionist. If this is your first time reading one of my posts then I highly recommend reading from the start. But if you are here just for ChatScript, then my name is Zac Brannelly, I am an IBL student completing my placement at the Applied Artificial Intelligence Institute. In this post, as previously mentioned, I will be explaining the use of ChatScript as the “brain” for Jenny instead of Dialogflow (which was discussed more in the previous post).</p>
+<h2 id="implementation">Implementation</h2>
+<p>After using Dialogflow for a few weeks, another project was being developed which was very similar to this project where the application was being made in Unity and involved communicating to a virtual avatar via speech input. They had elected to use an open-source chat-bot engine called ChatScript to handle the “brain” of the avatar. So I decided to look into how it works and whether it would be a better alternative to Dialogflow.</p>
+<p>ChatScript works a little different to Dialogflow since, as the name suggests, it uses scripts to determine the response to text input. These scripts are written in a custom language called ChatScript (duh) which looks like so:</p>
+<pre><code>topic: ~food []
+
+#! I like spinach
+s: ( I like spinach ) Are you a fan of the Popeye cartoons?
+	
+	a: ( ~yes )  I used to watch him as a child. Did you lust after Olive Oyl?
+    	    b: ( ~no ) Me neither. She was too skinny.
+    	    b: ( yes ) You probably like skinny models.
+	
+	a: ( ~no ) What cartoons do you watch?
+     		b: ( none ) You lead a deprived life.
+     		b: ( Mickey Mouse ) The Disney icon.
+
+#! I often eat chicken
+u: ( ![ not never rarely ] I * ~ingest * ~meat ) You eat meat.
+
+#! I really love chicken
+u: ( !~negativeWords I * ~like * ~meat ) You like meat.
+
+#! do you eat bacon?
+?: ( do you eat _ [ ham eggs bacon] ) I eat '_0
+</code></pre>
+<p>Where the words/symbols in the brackets are patterns (think of them like regular expressions) which are used to match user input with responses that are positioned outside the brackets. The prefix before the pattern tells ChatScript what type of input should be checked against the pattern, where <code>s:</code> means statements, <code>?:</code> means questions and <code>u:</code> means both (union). So off the bat there is much more of a learning curve using ChatScript over Dialogflow. You have to first learn the syntax of the scripting language and then the syntax of the pattern expressions. It is a lot more challenging to match input with an intent since in Dialogflow you can just come up with  a few variations of input during the training phase.</p>
+<p>But it does come with some advantages over Dialogflow. The first being the scripting language supports variables and if-statements! Which for a programmer makes them feel right at home and it makes controlling the flow of the conversation a lot more intuitive than how it is accomplished in Dialogflow (which is by using things called contexts). For example:</p>
+<pre><code>s: ( my name is _* )
+	$userName = _0
+	[So nice to meet you $userName]
+	[Nice to meet you $userName] 
+	
+?: ( what is my name )
+	if ($userName)
+	{
+		[You're name is $userName]
+		[I know you, your name is $userName]
+	}
+	else
+	{
+		[I don't know you.]
+		[Sorry, don't know your name.]
+	}
+</code></pre>
+<p>The next advantage is the concept of out-of-band (OOB) data which is the ability to send &amp; receive data that isn’t human input. For example if we wanted ChatScript to know what state the system is currently in we could send the state name in OOB data format (<code>[state WaitingForUsers]</code>) where ChatScript could use the pattern <code>( &lt; \[ state _* \] )</code> (where the <code>_*</code> symbols means save the next word(s) into the <code>_0</code> variable) to match with that input and save the data inside. We can then save the new state to a variable (<code>$currentState = _0</code>) and then alter responses according to that variable. OOB data can also be put into responses from ChatScript which is useful when you want to activate a function or state in the front-end application. For example when the bot asks a question to the user we might want the receptionist to start recording automatically so we could add <code>[{ "command": "StartRecording" }]</code> to the end of the response which could then be parsed by the front-end and the record function will be activated.</p>
+<p>So after learning all of this I decided to experiment with this system in the receptionist project. The default way to interact with ChatScript is to run it’s pre-built server binaries and send queries via TCP connection (where connection is terminated after each query). This took a while to get correct since in the manuals they say the protocol for requests is three null-terminated strings (user name, bot name, query string) OR use the ASCII value for 1 in place of the first two null-terminating zeros. I opted for the second option but for some reason it was just not working. I finally got it working with the first option by manually appending zeros on the end like so:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">var</span> byteStream <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">MemoryStream</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>userBytes<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> userBytes<span class="token punctuation">.</span>Length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span><span class="token keyword">new</span>  <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token punctuation">{</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>botBytes<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> botBytes<span class="token punctuation">.</span>Length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span><span class="token keyword">new</span>  <span class="token class-name">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token punctuation">{</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+byteStream<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>queryBytes<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> queryBytes<span class="token punctuation">.</span>Length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>Later on during experimentation, it was suggested to me that it was possible to compile the ChatScript C++ code into a native DLL which would allow me to use ChatScript without the need for a separate server. This seemed like a fun challenge and would be beneficial to the final product so I spent a few days trying this out. In the end I successfully compiled a DLL which could be used in Unity via P/Invoke. The code and instructions on doing this can be found in this repository: <a href="https://github.com/zacbrannelly/UnityChatScript">https://github.com/zacbrannelly/UnityChatScript</a></p>
+<p>Since I wasn’t sure on which system I wanted to use for Jenny’s “brain” I implemented an architecture that allowed me to easily switch between the two. I created an abstract class called <code>IChatService</code> (was originally an interface haha) which looked like so:</p>
+<pre class=" language-csharp"><code class="prism  language-csharp"><span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">IChatService</span> <span class="token punctuation">:</span> MonoBehaviour
+<span class="token punctuation">{</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">void</span> <span class="token function">SendQueryAsync</span><span class="token punctuation">(</span><span class="token keyword">string</span> text<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">string</span> <span class="token function">TakeResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">string</span> <span class="token function">PeekResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> ChatServiceResponse <span class="token function">TakeFullResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> ChatServiceResponse <span class="token function">PeekFullResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">bool</span> HasResponse <span class="token punctuation">{</span> <span class="token keyword">get</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>Then I created a singleton class called <code>ChatServiceManager</code> which holds an instance of <code>IChatService</code>. This class is then used everywhere user text input is sent to the “brain” for an intelligent response, where it will use the current <code>IChatService</code> instance set to <code>ChatServiceManager</code> to send a query.</p>
+<p>For the final implementation I choose to use ChatScript instead of Dialogflow for the receptionist’s “brain”. The main motivating factors for using this over Dialogflow was being able to send data to and from the system using out-of-band data, and the ability to save variables across different <em>intents</em> easily. The combination of the two was a perfect match for working with a State Machine on the front-end side. Where we can get/set the current state of the front-end app from the ChatScript using OOB and remember what the current state is in ChatScript using variables.</p>
+<p>So the front-end application would send a message like <code>[state RemoveUser]</code> to ChatScript and the code below would match with it and save the state to a variable:</p>
+<pre><code>u:  UNION_SET_STATE ( &lt;  \[ *  state  _*1 *  \] ) ^keep() ^repeat()
+	$currentState  = _0
+</code></pre>
+<p>Since the above specifies no response, ChatScript will look for another <em>intent</em> that matches with the  current input as well as the current state of the variables. ChatScript will eventualy match with the code below which is only matched when the <code>$currentState</code> variable is set to <code>RemoveUser</code> and the <code>$userType</code> variable is set to visitor. ChatScript will then send back one of the responses in the <code>[]</code> brackets.</p>
+<pre><code>t:  GAMBIT_STATE_REMOVE_USER ($currentState==RemoveUser $userType==visitor) ^keep() ^repeat()
+	[Are you sure you want to remove all your information?]
+	[Are you sure? This cannot be undone]
+	[This will erase all your data, are you sure?]
+	[Are you sure? I won't know you after!]
+	[This will remove your face from my memory, are you sure?]
+	[This cannot be undone, are you sure?]
+	[Are you sure you want me to forget about you?]
+
+	# Out of band data commanding front-end to show the are you sure dialog on the screen
+	\[ \{ \" command \" : \" ShowRemoveAreYouSure \" , \" startRecording \" : true  \} \]
+
+	a: (!(&lt; \[ ) &lt;&lt; ~yes &gt;&gt; )
+		[Alright removing your data now!]
+		[Alright, erasing my memory of you from my brain now.]
+		[Erasing your information now.]
+		[Deleting your data from my database now.]
+		[Okay, removing your information from my memory now.]
+		[Okay, erasing my memory of you from my brain now.]
+
+		# Out of band data commanding front-end to remove the user data
+		\[ \{ \" command \" : \" RemoveUserData \" \} \]
+
+	a: (!(&lt; \[ ) &lt;&lt; ~no &gt;&gt; )
+		[Canceling your request now!]
+		[Oh good, I can keep knowing you.]
+		[Stopping your request now!]
+		[Alright I'll keep your data.]
+		[Don't worry, I'll keep your data safe with me.]
+		[Alright, stopping your request now.]
+
+		# Out of band data commanding front-end to cancel the request
+		\[ \{ \" command \" : \" DontRemoveUserData \" \} \]
+</code></pre>
+<p>This code is an example of how we greet new users that  have just registered or have returned. It shows how easy it is to gather information from the user’s input and use said input in the response of the receptionist.</p>
+<pre><code>s:  STATEMENT_GREET_VISITOR ( &lt;  \[  visitor  has  approached  with  name  _*  \] ) ^keep() ^repeat()
+	$userName = _0
+	$userType = visitor
+
+	[Hello $userName]
+	[G'day $userName]
+	[Hi $userName]
+	[Ahoy $userName]
+	[Howdy $userName]
+	[Hey there $userName]
+	[Hello there $userName]
+	[Top of the morning to ya $userName]
+	[Why hello there $userName]
+	[ \" $userName ! \" It's good to see you.]
+	[ \" $userName ! \" It's wonderful to see you.]
+</code></pre>
+<p>Achieving the same result above is much more difficult in Dialogflow. The only advantage that Dialogflow has over ChatScript is their ability to match intents with phrases as it uses more advanced Natural Language Processing (NLP) techniques. One option would be to use Dialogflow solely for  the purpose of intent matching and then use ChatScript for the rest. I however didn’t choose to implement this as it would add a noticeable delay to all responses.</p>
+<p>I did end up using Dialogflow as a fallback “brain” that would only be used if absolutely nothing was matched in ChatScript. This, for example, made putting in small talk much more easier since Dialogflow has built-in small talk functionality. So you can  go up to the receptionist and ask her how her day is going (in any kind of variation) and she will respond appropriately.</p>
+<h2 id="takeaways">Takeaways</h2>
+<ul>
+<li>ChatScript is very well suited towards programmers as it uses scripts. With the use of variables and if-statements, it can help decrease the learning curve.</li>
+<li>ChatScript has the ability to be local (offline) whereas Dialogflow needs an internet connection.</li>
+<li>ChatScript can be compiled and used locally in native code (native plugin for Unity).</li>
+<li>ChatScript can be put in the cloud, you just have to host the server (pre-built) somewhere first.</li>
+<li>You have more control over information passed to and from ChatScript whereas in Dialogflow you have very little.</li>
+<li>For projects where matching an intent with what the user says isn’t too complex (especially if keyword matching suffices) ChatScript is a good option.</li>
+</ul>
+<h2 id="next-time-on-keeping-up-with-jenny...">Next time on Keeping Up With Jenny…</h2>
+<p>In the next installment of this mini-series I will be talking about the implementation of Jenny’s ability to talk with the user, specificially the implementation of speech-to-text and text-to-speech.</p>
+<p>Thanks for reading :)</p>
+</div>
+</body>
+
+</html>

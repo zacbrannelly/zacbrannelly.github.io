@@ -1,0 +1,81 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Making Jenny Smart - Open QA</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h1 id="making-jenny-smart---open-qa">Making Jenny Smart - Open QA</h1>
+<h2 id="introduction">Introduction</h2>
+<p>Hello there, welcome back to the <strong>final</strong> installment of my mini-series about the development of Jenny - The Virtual Receptionist. For those of you who don’t know me, i’d suggest reading the series from the beginning but if you are just here for my approach to open question answering then my name is Zac Brannelly, I am an IBL student completing my placement at the Applied Artificial Intelligence Institute (A2I2). In this post I will be discussing the implementation of open question answering using both DrQA and DuckDuckGo instant answer API.</p>
+<h2 id="drqa">DrQA</h2>
+<p><img src="https://github.com/facebookresearch/DrQA/raw/master/img/drqa.png" alt="" height="250"><br>
+AI researchers employed at Facebook wrote a paper called <a href="https://arxiv.org/abs/1704.00051">Reading Wikipedia to Answer Open-Domain Questions</a> in which they developed a system called DrQA which could use machine learning  techniques to first locate Wikipedia articles that may contain the answer to the question (Document Retriever) and then find the phrase most likely to be the answer (Document Reader). These two modules were trained on large QA data-sets making the system sometimes very accurate.</p>
+<p>The first challenge on experimenting with this project was actually getting it to run. I initially assumed this would be possible to run on a regular machine since there was no obvious warning in the README of the project. But after attempting to run the project on an Apple Mac Mini (since Windows was clearly not supported) I came to realization that it was running out of RAM. So I found a cloud service that was free to use through my University credentials and created a machine with over 50GB of RAM and 100GB of storage space, just to be sure haha. I was then finally able to install all the right dependencies, download a cache of the entire Wikipedia database from 2016 and run the interactive demo.</p>
+<p>Here I could experiment with what questions it was really good or bad at answering. Sometimes it was surprisingly accurate, for example when asking “Where is Batman?” it would return with “Gotham City”. But then other times it was off quite a bit, for example when asking “How many legs does a dog have?” it would come back with “Eight”.</p>
+<p><img src="https://i.pinimg.com/originals/d1/7a/df/d17adfd145f072fc8874d4ab73c209b8.jpg" alt=""><br>
+<em>Figure 1: Dogs according to DrQA</em></p>
+<p>Even after increasing the amount of documents it looks at for an answer it still was off with an answer of “Five”. But at least it was improving! So I decided to try and get this system into the “brain” of the receptionist. Obviously this couldn’t be added to the project directly since it can’t operate on Windows (unless in a Docker container) and it uses over 16GB of RAM, so next option was to create a web-server that would receive questions as HTTP POST requests and put the answer in the response (formatted in JSON).  The code and instructions on how to set up the web-server used can be found in this repository: <a href="https://github.com/zacbrannelly/drqa-server">https://github.com/zacbrannelly/drqa-server</a>. Here is a snippet of the code that is the most important, it shows how we interact with DrQA and get the answers to questions:</p>
+<pre class=" language-python"><code class="prism  language-python"><span class="token keyword">class</span> <span class="token class-name">ProcessQuestion</span><span class="token punctuation">(</span>Stage<span class="token punctuation">)</span><span class="token punctuation">:</span>
+	<span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+		logging<span class="token punctuation">.</span>log<span class="token punctuation">(</span>logging<span class="token punctuation">.</span>INFO<span class="token punctuation">,</span> <span class="token string">"Initializing the DrQA pipeline.."</span><span class="token punctuation">)</span>
+		self<span class="token punctuation">.</span>processor <span class="token operator">=</span> pipeline<span class="token punctuation">.</span>DrQA<span class="token punctuation">(</span>cuda<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+	
+	<span class="token keyword">def</span> <span class="token function">operate</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> data<span class="token punctuation">,</span> config<span class="token punctuation">)</span><span class="token punctuation">:</span>
+		<span class="token comment"># Attempt to process the question from input_data</span>
+		<span class="token keyword">try</span><span class="token punctuation">:</span>
+			result <span class="token operator">=</span> self<span class="token punctuation">.</span>processor<span class="token punctuation">.</span>process<span class="token punctuation">(</span>
+								data<span class="token punctuation">.</span>input_data<span class="token punctuation">,</span> 
+								<span class="token boolean">None</span><span class="token punctuation">,</span>
+								config<span class="token punctuation">[</span><span class="token string">'topAnswers'</span><span class="token punctuation">]</span><span class="token punctuation">,</span> 
+								config<span class="token punctuation">[</span><span class="token string">'numDocuments'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+								
+			data<span class="token punctuation">.</span>output_data <span class="token operator">=</span> <span class="token punctuation">{</span> <span class="token string">'question'</span><span class="token punctuation">:</span> data<span class="token punctuation">.</span>input_data<span class="token punctuation">,</span> <span class="token string">'answer'</span><span class="token punctuation">:</span> result<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">'span'</span><span class="token punctuation">]</span> <span class="token punctuation">}</span>
+		<span class="token keyword">except</span><span class="token punctuation">:</span>
+			data<span class="token punctuation">.</span>output_data <span class="token operator">=</span> <span class="token boolean">None</span>
+</code></pre>
+<p>Where we use the <code>process</code> function from the <code>pipeline.DrQA</code> class, which takes the question, the number of top answers to consider and the number of documents to search for answers. This function then returns the answer it found (if any). The <code>Stage</code> class we are inheriting here is from a new open source project called Surround that has been in development at A2I2 for a while now. It can be found <a href="https://github.com/a2i2/surround/">here</a> if you are interested in what it is used for. <code>data.output_data</code> is what is sent back as a response to the HTTP POST request.</p>
+<p>So a POST request to the web-server with the form field <code>question=Where is Batman?</code> would eventually return the response:</p>
+<pre class=" language-json"><code class="prism  language-json"><span class="token punctuation">{</span>
+	<span class="token string">"question"</span><span class="token punctuation">:</span> <span class="token string">"Where is Batman?"</span><span class="token punctuation">,</span>
+	<span class="token string">"answer"</span><span class="token punctuation">:</span> <span class="token string">"Gotham City"</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>Therefore in the Unity project all I needed to do was POST the data to the web-server, wait for the response, then get the receptionist to say the answer when it is received. This would occur when the user activated the <code>Question</code> intent (which could be activated by saying “Can I ask you a question?”), if this intent was detected, then the next input by the user would be sent to DrQA as a question instead of to the Dialogflow bot.</p>
+<p>The main issue with this system is sometimes it would take over 20 seconds to get a response from the server. So to fill in the time, I made the head of the receptionist spin like it was possessed until the response was received :)</p>
+<p><img src="https://lh3.googleusercontent.com/JWTzt9sHofxBKP4VHDBIh9mRpgbmeFIDPc-JlrC6NpFVcTNLn8QqGtHt7CmT9EnJMbUQmje0UlaC=s500" alt="enter image description here"><br>
+<em>Figure 2: GIF of Receptionist that has been possessed (lighting changed for dramatic purposes)</em></p>
+<h2 id="duckduckgo-instant-answer-api">DuckDuckGo Instant Answer API</h2>
+<p><img src="https://upload.wikimedia.org/wikipedia/en/thumb/8/88/DuckDuckGo_logo.svg/1200px-DuckDuckGo_logo.svg.png" alt="" height="200"><br>
+Since the DrQA system requires a lot of RAM and storage space and it must be on a separate machine to the Kiosk, it is not the most cost-effective version of question answering (since we have to pay for the server time). For this reason I looked around for already existing API’s that answer questions. I came across Duck Duck Go Instant Answer API which allows you to send queries to a web endpoint and it will return a JSON document containing an Abstract (summary of the topic or question). It also contains other information such as a link to an image that relates to the topic/answer.</p>
+<p>For example if you ask “What is Apple?” you get the following response (simplified):</p>
+<pre class=" language-json"><code class="prism  language-json"><span class="token punctuation">{</span>
+	<span class="token operator">...</span>
+	<span class="token string">"ImageWidth"</span><span class="token punctuation">:</span> <span class="token number">270</span><span class="token punctuation">,</span>
+	<span class="token string">"ImageHeight"</span> <span class="token punctuation">:</span> <span class="token number">270</span><span class="token punctuation">,</span>
+	<span class="token string">"Image"</span> <span class="token punctuation">:</span> <span class="token string">"https://duckduckgo.com/i/14b55389.jpg"</span><span class="token punctuation">,</span>
+	<span class="token string">"AbstractText"</span><span class="token punctuation">:</span> <span class="token string">"An apple is a sweet, edible fruit produced by... (continued)"</span><span class="token punctuation">,</span>
+	<span class="token operator">...</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>Use <a href="https://api.duckduckgo.com/?q=What%20is%20Apple&amp;format=json&amp;pretty=1">https://api.duckduckgo.com/?q=What%20is%20Apple&amp;format=json&amp;pretty=1</a> to see the full response.</p>
+<p>So I decided to implement this as a backup to when we don’t have a server running  for DrQA. Where the <code>AbstractText</code> field is considered the answer. As a bonus I used the image link  that is sometimes provided to be shown in a dialog on the screen like so:<br>
+<img src="https://lh3.googleusercontent.com/QhYZSKoqpoedH-zyiP3rgCPA91WkCGd28STOM4INki1QrJwtaw_W2ttKff6LxNkAJVbc3T9gsI-2=s500" alt="enter image description here"><br>
+<em>Figure 3: Dialog box showing image of an apple after asking “What is apple?”</em></p>
+<h2 id="takeaways">Takeaways</h2>
+<ul>
+<li>DrQA is the better option only if you are okay with paying for server time on a host machine with enough RAM space.</li>
+<li>DrQA takes a lot more time to setup and get working as compared to a ready to use API service.</li>
+<li>DuckDuckGo’s Instant Answer API struggles to answer most basic questions, for example “What is Apple?” works but “What is an Apple?” will return no response.</li>
+<li>Open question answering, although has improved, is still way off for majority of the questions you ask.</li>
+</ul>
+<h2 id="whats-next-on-keeping-up-with-jenny...">Whats next on Keeping Up With Jenny…</h2>
+<p>Unfortunately that is it for now! Thanks you so much for following this odd mini-series where I do my best to explain my methods and thinking. Hope it was helpful and/or interesting to read, this was my first time blogging, so I do apologize for anything that didn’t make sense or was extremely boring, I at least had fun writing it. See you next time :)</p>
+</div>
+</body>
+
+</html>
